@@ -1,0 +1,16 @@
+{
+  "name": "camera-relay",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Servidor que liga a câmera (celular) aos visualizadores pela internet",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  }
+}

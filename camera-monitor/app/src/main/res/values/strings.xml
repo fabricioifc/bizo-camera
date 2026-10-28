@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Monitor de Câmera</string>
+    <string name="toggle_start">Iniciar câmera</string>
+    <string name="toggle_stop">Parar câmera</string>
+    <string name="stopped">Câmera parada.</string>
+    <string name="need_camera">A permissão de câmera é necessária.</string>
+    <string name="need_login">Entre com sua conta para usar esta câmera.</string>
+    <string name="login_fill">Preencha e-mail e senha.</string>
+    <string name="login_loading">Entrando…</string>
+    <string name="login_error">E-mail ou senha incorretos, ou sem conexão com o servidor.</string>
+    <string name="register_error">Não foi possível registrar esta câmera. Verifique a conexão.</string>
+    <string name="status_connecting">Conectando ao servidor…</string>
+    <string name="status_connected">Conectada. Aguardando um visualizador.</string>
+    <string name="status_live">Transmitindo ao vivo.</string>
+    <string name="email_hint">E-mail</string>
+    <string name="password_hint">Senha</string>
+    <string name="login_button">Entrar</string>
+    <string name="sign_out">Sair da conta neste aparelho</string>
+    <string name="notif_channel">Transmissão da câmera</string>
+    <string name="notif_title">Câmera ativa</string>
+    <string name="notif_text">Conectada ao servidor</string>
+    <string name="notif_stop">Parar</string>
+</resources>

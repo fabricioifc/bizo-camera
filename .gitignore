@@ -1,0 +1,9 @@
+# Arquivos do sistema e do editor (valem para os dois projetos).
+Thumbs.db
+desktop.ini
+.vscode/
+.DS_Store
+
+# Cada projeto tem o seu próprio .gitignore:
+#   relay-server/.gitignore
+#   camera-monitor/.gitignore

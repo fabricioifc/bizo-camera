@@ -1,0 +1,18 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+build/
+app/build/
+captures/
+# Assinatura: nunca versionar.
+keystore.properties
+*.jks
+*.keystore
+# Saídas de build.
+*.apk
+*.aab
+app/release/
+.cxx/
+.kotlin/
+.DS_Store

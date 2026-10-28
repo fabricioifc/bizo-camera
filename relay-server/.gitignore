@@ -1,0 +1,5 @@
+node_modules/
+# Banco local com contas e hashes: nunca versionar.
+data/
+.env
+*.log

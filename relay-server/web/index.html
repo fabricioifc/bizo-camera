@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitor de Câmera</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Monitor de Câmera</h1>
+    <div class="header-actions">
+      <span id="connection" class="badge">Conectando…</span>
+      <button id="logout" type="button" class="secondary" hidden>Sair</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="auth-view" class="panel" hidden>
+      <h2>Entrar</h2>
+      <form id="auth-form">
+        <input id="email" type="email" autocomplete="username" placeholder="E-mail" required>
+        <input id="password" type="password" autocomplete="current-password" placeholder="Senha (mínimo 8 caracteres)" minlength="8" required>
+        <div class="actions">
+          <button type="submit" id="login-button">Entrar</button>
+          <button type="button" id="signup-button" class="secondary" hidden>Criar conta</button>
+        </div>
+      </form>
+      <p id="auth-message" class="hint"></p>
+    </section>
+
+    <section id="list-view" hidden>
+      <div id="devices" class="cards"></div>
+      <p id="empty" class="hint" hidden>Nenhuma câmera registrada nesta conta. Faça login no app da câmera.</p>
+    </section>
+
+    <section id="viewer-view" hidden>
+      <div class="viewer-top">
+        <button id="back" type="button" class="secondary">← Voltar</button>
+        <strong id="viewer-title"></strong>
+      </div>
+      <div class="stage">
+        <img id="frame" alt="Transmissão ao vivo" hidden>
+        <p id="viewer-status" class="hint">Conectando…</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
