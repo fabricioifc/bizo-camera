@@ -5,14 +5,16 @@ Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadro
 ## Compilar e instalar
 
 1. Abra a pasta `camera-monitor` no Android Studio.
-2. Em [app/build.gradle.kts](app/build.gradle.kts), troque `RELAY_URL` pelo endereço `https://` do seu servidor.
+2. O endereço do servidor é `https://camera.bizo.dev.br` por padrão. Para usar outro, passe a propriedade `relayUrl` ao Gradle:
+   - Linha de comando: `./gradlew assembleRelease -PrelayUrl=https://outro.dominio`
+   - Ou, para valer em todos os builds, adicione `relayUrl=https://outro.dominio` em `~/.gradle/gradle.properties` (no Windows, `C:\Users\<usuário>\.gradle\gradle.properties`).
 3. Conecte o celular com depuração USB e clique em Run.
 
 ## Uso
 
-1. Toque em **Iniciar câmera** e conceda as permissões.
-2. O app mostra um QR code e um código de 6 números.
-3. Escaneie o QR code com o celular que vai assistir (ele abre o site e pareia sozinho).
+1. Abra o app, entre com e-mail e senha da conta. Se a conta tiver verificação em duas etapas, digite o código do app autenticador quando ele pedir.
+2. Toque em **Iniciar câmera**, concedendo as permissões.
+2. Abra o endereço do servidor no navegador do outro celular ou computador e entre com a mesma conta para assistir.
 
 ## Configurações no Xiaomi Mi A3 (MIUI)
 

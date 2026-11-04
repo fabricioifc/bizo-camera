@@ -9,6 +9,10 @@
     <string name="login_fill">Preencha e-mail e senha.</string>
     <string name="login_loading">Entrando…</string>
     <string name="login_error">E-mail ou senha incorretos, ou sem conexão com o servidor.</string>
+    <string name="mfa_prompt">Digite o código de 6 números do seu app autenticador (ou um código de recuperação).</string>
+    <string name="mfa_code_hint">Código de verificação</string>
+    <string name="mfa_fill">Digite o código.</string>
+    <string name="mfa_failed">Código incorreto ou expirado. Se expirou, entre com a senha de novo.</string>
     <string name="register_error">Não foi possível registrar esta câmera. Verifique a conexão.</string>
     <string name="status_connecting">Conectando ao servidor…</string>
     <string name="status_connected">Conectada. Aguardando um visualizador.</string>

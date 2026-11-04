@@ -211,3 +211,85 @@ button.secondary {
   width: 100%;
   height: auto;
 }
+
+#mfa-form,
+#enable-form,
+#disable-form {
+  flex-direction: column;
+}
+
+#mfa-form input,
+#enable-form input,
+#disable-form input {
+  flex: none;
+  width: 100%;
+  letter-spacing: normal;
+  text-align: left;
+}
+
+#mfa-code,
+#enable-code,
+#disable-code {
+  letter-spacing: 0.2em;
+  text-align: center;
+}
+
+#mfa-form .actions button,
+#enable-form .actions button,
+#disable-form .actions button {
+  flex: 1;
+}
+
+.button {
+  display: block;
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--line);
+  color: var(--text);
+  text-align: center;
+  text-decoration: none;
+}
+
+.button.google {
+  background: #fff;
+  color: #1f1f1f;
+}
+
+button.danger {
+  background: var(--danger);
+}
+
+#setup-section button,
+#recovery-section button {
+  margin-top: 12px;
+}
+
+#setup-qr {
+  display: block;
+  margin: 12px 0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.codes li {
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--bg);
+  text-align: center;
+}
+
+code {
+  font-family: ui-monospace, Consolas, monospace;
+  word-break: break-all;
+}

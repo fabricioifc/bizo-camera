@@ -6,10 +6,15 @@ services:
       # Publicado só em localhost: o cloudflared acessa daqui, sem exposição direta à internet.
       - "127.0.0.1:8787:8787"
     environment:
+      # Endereço público (usado nos links de retorno do login com Google e no cookie seguro).
+      PUBLIC_URL: https://camera.bizo.dev.br
       # Atrás do cloudflared, usa o IP real do cliente (X-Forwarded-For) para limitar tentativas.
       TRUST_PROXY: "1"
       # Só o primeiro usuário pode se cadastrar. Use "1" temporariamente para criar outra conta.
       ALLOW_SIGNUP: "0"
+      # Login com Google: deixe vazio para desativar. Os valores podem vir do arquivo .env (fora do git).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
       - relay-data:/data
 

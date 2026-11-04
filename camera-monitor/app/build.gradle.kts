@@ -11,6 +11,10 @@ val keystoreProps = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+// Endereço do servidor de retransmissão. Troque sem editar este arquivo:
+// -PrelayUrl=https://outro.dominio na linha de comando, ou relayUrl=... em ~/.gradle/gradle.properties.
+val relayUrl: String = (findProperty("relayUrl") as String?) ?: "https://camera.bizo.dev.br"
+
 android {
     namespace = "com.example.cameramonitor"
     compileSdk = 34
@@ -22,8 +26,7 @@ android {
         versionCode = 2
         versionName = "0.2.0"
 
-        // Endereço público do servidor de retransmissão (use https).
-        buildConfigField("String", "RELAY_URL", "\"https://camera.bizo.dev.br\"")
+        buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
     }
 
     signingConfigs {

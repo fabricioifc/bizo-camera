@@ -18,6 +18,9 @@ class MainActivity : AppCompatActivity() {
     private val relay by lazy { RelayClient(this) }
     private val io = Executors.newSingleThreadExecutor()
 
+    // Token da etapa 2FA, enquanto o app espera o código do usuário.
+    private var pendingMfaToken: String? = null
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -59,6 +62,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun signIn() {
+        val pending = pendingMfaToken
+        if (pending != null) {
+            submitCode(pending)
+            return
+        }
         val email = binding.emailInput.text.toString().trim()
         val password = binding.passwordInput.text.toString()
         if (email.isEmpty() || password.isEmpty()) {
@@ -68,19 +76,60 @@ class MainActivity : AppCompatActivity() {
         binding.loginButton.isEnabled = false
         binding.loginMessage.text = getString(R.string.login_loading)
         io.execute {
-            val loggedIn = relay.signIn(email, password)
-            val registered = loggedIn && relay.registerDevice()
-            runOnUiThread {
-                binding.loginButton.isEnabled = true
-                binding.loginMessage.text = when {
-                    !loggedIn -> getString(R.string.login_error)
-                    !registered -> getString(R.string.register_error)
-                    else -> ""
+            when (val result = relay.signIn(email, password)) {
+                is RelayClient.SignInResult.NeedsCode -> runOnUiThread { askForCode(result.mfaToken) }
+                RelayClient.SignInResult.Failed -> runOnUiThread { finishLogin(loggedIn = false, registered = false) }
+                RelayClient.SignInResult.Done -> {
+                    val registered = relay.registerDevice()
+                    runOnUiThread { finishLogin(loggedIn = true, registered = registered) }
                 }
-                if (loggedIn) binding.passwordInput.text?.clear()
-                refresh()
             }
         }
+    }
+
+    private fun askForCode(mfaToken: String) {
+        pendingMfaToken = mfaToken
+        binding.codeInput.visibility = View.VISIBLE
+        binding.codeInput.text?.clear()
+        binding.loginButton.isEnabled = true
+        binding.loginMessage.text = getString(R.string.mfa_prompt)
+        binding.codeInput.requestFocus()
+    }
+
+    private fun submitCode(mfaToken: String) {
+        val code = binding.codeInput.text.toString().trim()
+        if (code.isEmpty()) {
+            binding.loginMessage.text = getString(R.string.mfa_fill)
+            return
+        }
+        binding.loginButton.isEnabled = false
+        binding.loginMessage.text = getString(R.string.login_loading)
+        io.execute {
+            val loggedIn = relay.signInWithCode(mfaToken, code)
+            val registered = loggedIn && relay.registerDevice()
+            runOnUiThread {
+                if (loggedIn) {
+                    pendingMfaToken = null
+                    binding.codeInput.visibility = View.GONE
+                    binding.codeInput.text?.clear()
+                    finishLogin(loggedIn = true, registered = registered)
+                } else {
+                    binding.loginButton.isEnabled = true
+                    binding.loginMessage.text = getString(R.string.mfa_failed)
+                }
+            }
+        }
+    }
+
+    private fun finishLogin(loggedIn: Boolean, registered: Boolean) {
+        binding.loginButton.isEnabled = true
+        binding.loginMessage.text = when {
+            !loggedIn -> getString(R.string.login_error)
+            !registered -> getString(R.string.register_error)
+            else -> ""
+        }
+        if (loggedIn) binding.passwordInput.text?.clear()
+        refresh()
     }
 
     private fun requestPermissionsAndStart() {

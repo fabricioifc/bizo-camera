@@ -11,6 +11,7 @@
     <h1>Monitor de Câmera</h1>
     <div class="header-actions">
       <span id="connection" class="badge">Conectando…</span>
+      <button id="security" type="button" class="secondary" hidden>Segurança</button>
       <button id="logout" type="button" class="secondary" hidden>Sair</button>
     </div>
   </header>
@@ -26,7 +27,63 @@
           <button type="button" id="signup-button" class="secondary" hidden>Criar conta</button>
         </div>
       </form>
+      <a id="google-button" class="button google" href="/api/auth/google/start" hidden>Entrar com Google</a>
       <p id="auth-message" class="hint"></p>
+    </section>
+
+    <section id="mfa-view" class="panel" hidden>
+      <h2>Código de verificação</h2>
+      <p class="hint">Digite o código de 6 números do seu app autenticador, ou um código de recuperação.</p>
+      <form id="mfa-form">
+        <input id="mfa-code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" maxlength="9" required>
+        <div class="actions">
+          <button type="submit" id="mfa-button">Confirmar</button>
+          <button type="button" id="mfa-cancel" class="secondary">Cancelar</button>
+        </div>
+      </form>
+      <p id="mfa-message" class="hint"></p>
+    </section>
+
+    <section id="security-view" class="panel" hidden>
+      <h2>Segurança da conta</h2>
+      <p id="security-status" class="hint"></p>
+
+      <div id="setup-section" hidden>
+        <button id="setup-button" type="button">Ativar verificação em duas etapas</button>
+        <div id="setup-details" hidden>
+          <p class="hint">Escaneie o QR code com seu app autenticador (Google Authenticator, Authy, 1Password…) ou digite a chave manualmente.</p>
+          <img id="setup-qr" alt="QR code do 2FA" width="220" height="220">
+          <p class="hint">Chave: <code id="setup-secret"></code></p>
+          <form id="enable-form">
+            <input id="enable-code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" maxlength="6" required>
+            <div class="actions">
+              <button type="submit">Confirmar e ativar</button>
+            </div>
+          </form>
+        </div>
+        <div id="recovery-section" hidden>
+          <p class="hint"><strong>Guarde estes códigos de recuperação.</strong> Cada um vale uma vez e não serão mostrados de novo.</p>
+          <ul id="recovery-list" class="codes"></ul>
+          <div class="actions">
+            <button id="recovery-done" type="button">Já guardei</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="disable-section" hidden>
+        <form id="disable-form">
+          <input id="disable-password" type="password" autocomplete="current-password" placeholder="Senha da conta">
+          <input id="disable-code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Código do app ou de recuperação" required>
+          <div class="actions">
+            <button type="submit" class="danger">Desativar verificação em duas etapas</button>
+          </div>
+        </form>
+      </div>
+
+      <p id="security-message" class="hint"></p>
+      <div class="actions">
+        <button id="security-back" type="button" class="secondary">← Voltar</button>
+      </div>
     </section>
 
     <section id="list-view" hidden>

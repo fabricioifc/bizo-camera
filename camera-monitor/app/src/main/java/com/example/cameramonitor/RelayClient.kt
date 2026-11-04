@@ -39,10 +39,32 @@ class RelayClient(context: Context) {
     val isSignedIn: Boolean get() = prefs.contains(KEY_SESSION)
     val isRegistered: Boolean get() = prefs.contains(KEY_ID) && prefs.contains(KEY_SECRET)
 
-    /** Entra com a conta. Retorna false se o e-mail, a senha ou a conexão falharem. */
-    fun signIn(email: String, password: String): Boolean {
+    sealed class SignInResult {
+        object Done : SignInResult()
+        class NeedsCode(val mfaToken: String) : SignInResult()
+        object Failed : SignInResult()
+    }
+
+    /** Entra com a conta. Se a conta tiver verificação em duas etapas, pede o código depois. */
+    fun signIn(email: String, password: String): SignInResult {
         val body = JSONObject().put("email", email).put("password", password).toString()
-        val login = post("/api/auth/login", body, session = null) ?: return false
+        val response = post("/api/auth/login", body, session = null) ?: return SignInResult.Failed
+        if (response.optBoolean("mfaRequired")) {
+            return SignInResult.NeedsCode(response.getString("mfaToken"))
+        }
+        saveSession(response)
+        return SignInResult.Done
+    }
+
+    /** Segundo passo do login: o código do app autenticador ou um código de recuperação. */
+    fun signInWithCode(mfaToken: String, code: String): Boolean {
+        val body = JSONObject().put("mfaToken", mfaToken).put("code", code).toString()
+        val response = post("/api/auth/mfa", body, session = null) ?: return false
+        saveSession(response)
+        return true
+    }
+
+    private fun saveSession(login: JSONObject) {
         val owner = login.getString("email")
         val editor = prefs.edit()
             .putString(KEY_SESSION, login.getString("token"))
@@ -50,7 +72,6 @@ class RelayClient(context: Context) {
         // Câmera registrada por outra conta (ou pela versão antiga do app) não pertence a esta.
         if (prefs.getString(KEY_OWNER, null) != owner) editor.remove(KEY_ID).remove(KEY_SECRET)
         editor.apply()
-        return true
     }
 
     /** Remove a sessão deste aparelho. A câmera continua registrada na conta. */
