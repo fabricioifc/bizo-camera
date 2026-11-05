@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aba Início: status, prévia, botão de iniciar/parar, aviso de bateria e resumo das configurações. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
+
+        <!-- Status da câmera -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/statusCard"
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout style="@style/SectionCardContent">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:background="@drawable/status_dot" />
+
+                    <TextView
+                        android:id="@+id/statusTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/statusDetail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <!-- Conexão: tempo conectada e quedas (só com a câmera ligada) -->
+                <LinearLayout
+                    android:id="@+id/statsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/stat_uptime"
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:id="@+id/uptimeValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/stat_drops"
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:id="@+id/dropsValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Celular quente: qualidade reduzida -->
+                <TextView
+                    android:id="@+id/hotWarning"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_warning"
+                    android:drawablePadding="8dp"
+                    android:gravity="center_vertical"
+                    android:padding="12dp"
+                    android:text="@string/status_hot_full"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="@color/on_warning_container"
+                    android:visibility="gone"
+                    app:drawableStartCompat="@drawable/ic_warning"
+                    app:drawableTint="@color/on_warning_container" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Prévia: só com a câmera parada, porque a câmera tem um dono por vez -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/previewCard"
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="#000000">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="260dp">
+
+                <androidx.camera.view.PreviewView
+                    android:id="@+id/previewView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    app:scaleType="fitCenter" />
+
+                <TextView
+                    android:id="@+id/previewLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="12dp"
+                    android:background="@drawable/bg_preview_label"
+                    android:paddingStart="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="4dp"
+                    android:text="@string/preview_label"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
+                    android:textColor="#FFFFFF" />
+
+                <LinearLayout
+                    android:id="@+id/previewPermission"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="20dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/preview_permission"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="#C8CDD6" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/previewPermissionButton"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/preview_permission_button" />
+
+                </LinearLayout>
+
+            </FrameLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/toggleButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:minHeight="64dp"
+            android:text="@string/toggle_start"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            app:icon="@drawable/ic_play"
+            app:iconGravity="textStart" />
+
+        <!-- Aviso de economia de bateria: só enquanto o app não estiver liberado -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/batteryCard"
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/warning_container"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_battery"
+                    app:tint="@color/on_warning_container" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="@string/battery_short"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="@color/on_warning_container" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/batteryButton"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="@string/battery_button" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Resumo das configurações; cada linha abre a aba correspondente -->
+        <TextView
+            style="@style/SectionTitle"
+            android:text="@string/summary_title" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/summaryImage"
+                    style="@style/SummaryRow">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/image_title"
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                    <TextView
+                        android:id="@+id/summaryImageValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="4dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                </LinearLayout>
+
+                <com.google.android.material.divider.MaterialDivider
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp" />
+
+                <LinearLayout
+                    android:id="@+id/summaryMotion"
+                    style="@style/SummaryRow">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/motion_title"
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                    <TextView
+                        android:id="@+id/summaryMotionValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="4dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                </LinearLayout>
+
+                <com.google.android.material.divider.MaterialDivider
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp" />
+
+                <LinearLayout
+                    android:id="@+id/summaryProtection"
+                    style="@style/SummaryRow">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/protection_title"
+                        android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                    <TextView
+                        android:id="@+id/summaryProtectionValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="4dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+
+</ScrollView>

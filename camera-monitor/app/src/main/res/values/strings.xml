@@ -2,6 +2,11 @@
 <resources>
     <string name="app_name">Monitor de Câmera</string>
 
+    <!-- Navegação -->
+    <string name="nav_home">Início</string>
+    <string name="nav_camera">Câmera</string>
+    <string name="nav_settings">Ajustes</string>
+
     <!-- Câmera -->
     <string name="toggle_start">Iniciar câmera</string>
     <string name="toggle_stop">Parar câmera</string>
@@ -20,7 +25,9 @@
     <string name="status_live_title">Ao vivo</string>
     <string name="status_live_detail">Alguém está assistindo agora.</string>
     <string name="status_uptime">Conectada há %1$s</string>
-    <string name="status_hot">celular quente, qualidade reduzida</string>
+    <string name="status_hot_full">Celular quente: a qualidade foi reduzida para ele esfriar.</string>
+    <string name="stat_uptime">Conectada há</string>
+    <string name="stat_drops">Quedas de conexão</string>
     <plurals name="status_drops">
         <item quantity="one">%d queda</item>
         <item quantity="other">%d quedas</item>
@@ -30,6 +37,7 @@
     <string name="duration_hours">%1$d h %2$d min</string>
 
     <!-- Prévia -->
+    <string name="preview_label">Prévia</string>
     <string name="preview_permission">Permita o uso da câmera para ver a prévia.</string>
     <string name="preview_permission_button">Permitir câmera</string>
 
@@ -37,10 +45,31 @@
     <string name="battery_short">Permita que a câmera funcione com a tela apagada.</string>
     <string name="battery_button">Permitir</string>
 
-    <!-- Configurações -->
-    <string name="settings_title">Configurações</string>
-    <string name="settings_back">Voltar</string>
-    <string name="settings_version">Versão %1$s (%2$d)</string>
+    <!-- Resumo na aba Início -->
+    <string name="summary_title">Esta câmera</string>
+    <string name="summary_image">%1$s · %2$s</string>
+    <string name="summary_motion_on">Ligada · %1$s</string>
+    <string name="summary_motion_off">Desligada</string>
+    <string name="summary_pin_on">PIN ativo</string>
+    <string name="summary_pin_off">Sem PIN</string>
+
+    <!-- Aba Câmera -->
+    <string name="camera_intro">As mudanças valem na hora, mesmo com a câmera ligada.</string>
+    <string name="motion_switch">Detectar movimento</string>
+    <string name="sensitivity_low_hint">Só movimentos grandes, como uma pessoa passando perto.</string>
+    <string name="sensitivity_medium_hint">Equilíbrio entre avisar logo e evitar alarmes falsos.</string>
+    <string name="sensitivity_high_hint">Percebe movimentos pequenos; pode avisar por mudanças de luz.</string>
+
+    <!-- Aba Ajustes -->
+    <string name="settings_version">Monitor de Câmera · versão %1$s (%2$d)</string>
+    <string name="appearance_title">Aparência</string>
+    <string name="theme_label">Tema</string>
+    <string name="theme_system">Sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Escuro</string>
+    <string name="theme_hint">Sistema segue o tema claro ou escuro do celular.</string>
+    <string name="server_label">Endereço</string>
+    <string name="account_label">Conta Google</string>
     <string name="image_title">Imagem</string>
     <string name="image_lens_label">Câmera</string>
     <string name="lens_back">Traseira</string>
@@ -57,7 +86,7 @@
     <string name="motion_on_hint">Guarda uma foto e envia um alerta aos navegadores com alertas ativados no site.</string>
     <string name="motion_off_hint">Desligada: nenhum movimento é registrado.</string>
     <string name="server_title">Servidor</string>
-    <string name="server_change">Alterar servidor</string>
+    <string name="server_change">Alterar</string>
     <string name="server_dialog_title">Endereço do servidor</string>
     <string name="server_hint">Endereço, como camera.exemplo.com</string>
     <string name="server_helper">Use o mesmo endereço do site. Padrão: %1$s</string>
@@ -67,13 +96,15 @@
     <string name="server_saved">Servidor alterado.</string>
     <string name="login_server">Servidor: %1$s</string>
     <string name="account_title">Conta</string>
-    <string name="sign_out">Sair da conta neste aparelho</string>
+    <string name="sign_out">Sair da conta</string>
     <string name="sign_out_running_hint">Pare a câmera para sair da conta.</string>
 
     <!-- Proteção por PIN -->
     <string name="protection_title">Proteção</string>
-    <string name="protection_off">Sem PIN, qualquer pessoa com acesso ao celular pode parar a câmera.</string>
-    <string name="protection_on">PIN ativo: ele é pedido para parar a câmera e para abrir as configurações.</string>
+    <string name="protection_off_title">Sem PIN</string>
+    <string name="protection_on_title">PIN ativo</string>
+    <string name="protection_off">Qualquer pessoa com acesso ao celular pode parar a câmera ou mudar os ajustes.</string>
+    <string name="protection_on">O PIN é pedido para parar a câmera e para abrir as abas Câmera e Ajustes.</string>
     <string name="pin_set">Definir PIN</string>
     <string name="pin_change">Alterar PIN</string>
     <string name="pin_remove">Remover PIN</string>
@@ -93,6 +124,7 @@
 
     <!-- Login -->
     <string name="login_title">Entrar</string>
+    <string name="login_tagline">Transforme este celular numa câmera de segurança.</string>
     <string name="login_hint">Use a mesma conta Google do site para ver esta câmera de qualquer lugar.</string>
     <string name="login_button">Entrar com Google</string>
     <string name="login_config_missing">Falta o Client ID do Google no build (googleServerClientId).</string>

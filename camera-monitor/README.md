@@ -31,7 +31,7 @@ O Gradle precisa de um JDK entre 17 e 23. O Android Studio já traz um (por exem
    - **Terminal:** crie `keystore.properties` na pasta `camera-monitor` (fora do git) com `storeFile`, `storePassword`, `keyAlias` e `keyPassword`, e rode `./gradlew assembleRelease`. O APK sai em `app/build/outputs/apk/release/app-release.apk`.
 3. Instale no celular por cima da versão anterior e confira o login e a câmera.
 
-A versão aparece no fim da tela **Configurações** (por exemplo, "Versão 0.3.0 (17)").
+A versão aparece no fim da aba **Ajustes** (por exemplo, "versão 0.3.0 (17)").
 
 **Diferenças do release para o debug:**
 
@@ -42,9 +42,13 @@ A versão aparece no fim da tela **Configurações** (por exemplo, "Versão 0.3.
 
 ## Organização do código
 
-- `MainActivity`: tela principal (status, prévia, iniciar/parar, avisos).
+- `MainActivity`: tela única. Sem conta, mostra o login; com conta, a barra do topo e a navegação inferior com três abas. Pede o PIN para abrir as abas Câmera e Ajustes.
+- `HomeFragment` (aba **Início**): status, prévia, iniciar/parar, aviso de bateria e resumo dos ajustes com atalhos.
+- `CameraFragment` (aba **Câmera**): lente, qualidade e detecção de movimento.
+- `SettingsFragment` (aba **Ajustes**): tema, PIN, servidor, conta e versão.
 - `LoginController`: login com Google, código 2FA, configuração do 2FA e códigos de recuperação.
-- `SettingsActivity`: imagem, detecção de movimento, PIN e conta.
+- `CameraStarter`: registra o aparelho e liga ou desliga o serviço da câmera.
+- `AppTheme`, `CameraMonitorApp`: tema do sistema, claro ou escuro, aplicado ao abrir o app. As cores ficam em `res/values/colors.xml` (claro) e `res/values-night/colors.xml` (escuro).
 - `StreamService`: serviço em primeiro plano que mantém a câmera e a conexão.
 - `MotionDetector`, `ThermalLimit`, `DeviceHealth`, `FrameConversion`: peças usadas pelo serviço.
 - `RelayClient`: login na API e conexão com o servidor.
@@ -53,8 +57,10 @@ A versão aparece no fim da tela **Configurações** (por exemplo, "Versão 0.3.
 ## Uso
 
 1. Toque em **Entrar com Google** e escolha a conta. Se a conta tiver verificação em duas etapas, digite o código do app autenticador. Se não tiver, configure o 2FA no próprio app, escaneando o QR code e guardando os códigos de recuperação.
-2. Toque em **Iniciar câmera**, concedendo as permissões.
+2. Na aba **Início**, toque em **Iniciar câmera**, concedendo as permissões.
 3. Abra o endereço do servidor no navegador do outro celular ou computador e entre com a mesma conta para assistir.
+
+A aba **Câmera** muda lente, qualidade e detecção de movimento (vale na hora, mesmo transmitindo). A aba **Ajustes** tem o tema (sistema, claro ou escuro), o PIN, o servidor e a conta.
 
 ## Configurações no Xiaomi Mi A3 (MIUI)
 

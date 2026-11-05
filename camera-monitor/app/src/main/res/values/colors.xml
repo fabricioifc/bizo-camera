@@ -1,5 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Paleta do tema claro (a mesma do site). O tema escuro fica em values-night/colors.xml. -->
+    <color name="primary">#2563EB</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#DBE6FE</color>
+    <color name="on_primary_container">#0B2A6B</color>
+    <color name="surface">#F7F8FA</color>
+    <color name="surface_lowest">#FFFFFF</color>
+    <color name="surface_low">#FFFFFF</color>
+    <color name="surface_container">#ECEEF2</color>
+    <color name="surface_high">#E6E9EE</color>
+    <color name="surface_highest">#E0E4EA</color>
+    <color name="on_surface">#14171C</color>
+    <color name="on_surface_variant">#5D6675</color>
+    <color name="outline">#C3C8D0</color>
+    <color name="outline_variant">#E2E5EA</color>
+    <color name="error">#DC2626</color>
+    <color name="on_error">#FFFFFF</color>
+    <color name="error_container">#FDE2E2</color>
+    <color name="on_error_container">#7F1D1D</color>
+    <color name="warning_container">#FEF3C7</color>
+    <color name="on_warning_container">#7C4A03</color>
+
     <!-- Cores do indicador de status da câmera. -->
     <color name="status_off">#9E9E9E</color>
     <color name="status_connecting">#F59E0B</color>

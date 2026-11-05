@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Paleta do tema escuro (a mesma do site). -->
+    <color name="primary">#93B4FF</color>
+    <color name="on_primary">#0B2A6B</color>
+    <color name="primary_container">#1E3A8A</color>
+    <color name="on_primary_container">#DBE6FE</color>
+    <color name="surface">#0E1014</color>
+    <color name="surface_lowest">#0A0C0F</color>
+    <color name="surface_low">#171A20</color>
+    <color name="surface_container">#171A20</color>
+    <color name="surface_high">#1F232B</color>
+    <color name="surface_highest">#2A2F39</color>
+    <color name="on_surface">#E8EAF0</color>
+    <color name="on_surface_variant">#9AA3B2</color>
+    <color name="outline">#4A5260</color>
+    <color name="outline_variant">#2A2F39</color>
+    <color name="error">#F87171</color>
+    <color name="on_error">#450A0A</color>
+    <color name="error_container">#5B1515</color>
+    <color name="on_error_container">#FDE2E2</color>
+    <color name="warning_container">#4A3305</color>
+    <color name="on_warning_container">#FDE68A</color>
+</resources>

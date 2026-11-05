@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Aba Câmera: imagem (lente e qualidade) e detecção de movimento. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="@string/camera_intro"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+        <!-- Imagem -->
+        <TextView
+            style="@style/SectionTitle"
+            android:text="@string/image_title" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout style="@style/SectionCardContent">
+
+                <TextView
+                    style="@style/OptionLabel"
+                    android:text="@string/image_lens_label" />
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/lensGroup"
+                    style="@style/ChoiceGroup">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/lensBack"
+                        style="@style/ChoiceButton"
+                        android:text="@string/lens_back" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/lensFront"
+                        style="@style/ChoiceButton"
+                        android:text="@string/lens_front" />
+
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <com.google.android.material.divider.MaterialDivider style="@style/CardDivider" />
+
+                <TextView
+                    style="@style/OptionLabel"
+                    android:text="@string/image_quality_label" />
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/qualityGroup"
+                    style="@style/ChoiceGroup">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/qualityLow"
+                        style="@style/ChoiceButton"
+                        android:text="@string/quality_low" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/qualityMedium"
+                        style="@style/ChoiceButton"
+                        android:text="@string/quality_medium" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/qualityHigh"
+                        style="@style/ChoiceButton"
+                        android:text="@string/quality_high" />
+
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <TextView
+                    android:id="@+id/qualityHint"
+                    style="@style/OptionHint" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Detecção de movimento -->
+        <TextView
+            style="@style/SectionTitle"
+            android:text="@string/motion_title" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout style="@style/SectionCardContent">
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/motionSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/motion_switch"
+                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                <TextView
+                    android:id="@+id/motionHint"
+                    style="@style/OptionHint"
+                    android:layout_marginTop="0dp" />
+
+                <com.google.android.material.divider.MaterialDivider style="@style/CardDivider" />
+
+                <TextView
+                    android:id="@+id/sensitivityLabel"
+                    style="@style/OptionLabel"
+                    android:text="@string/motion_sensitivity_label" />
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/sensitivityGroup"
+                    style="@style/ChoiceGroup">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/sensitivityLow"
+                        style="@style/ChoiceButton"
+                        android:text="@string/quality_low" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/sensitivityMedium"
+                        style="@style/ChoiceButton"
+                        android:text="@string/quality_medium" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/sensitivityHigh"
+                        style="@style/ChoiceButton"
+                        android:text="@string/quality_high" />
+
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <TextView
+                    android:id="@+id/sensitivityHint"
+                    style="@style/OptionHint" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+
+</ScrollView>
