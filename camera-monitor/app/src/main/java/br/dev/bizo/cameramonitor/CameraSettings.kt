@@ -47,12 +47,13 @@ object CameraSettings {
     private const val KEY_ROTATION = "rotation"
     private const val KEY_TORCH = "torch"
     private const val KEY_VIDEO = "video"
+    const val KEY_NIGHT = "night"
     const val KEY_ZOOM = "zoom"
     private const val KEY_ZOOM_MIN = "zoomMin"
     private const val KEY_ZOOM_MAX = "zoomMax"
 
-    /** Lente e qualidade exigem religar a câmera; as demais configurações valem na hora. */
-    fun affectsCamera(key: String?) = key == KEY_LENS || key == KEY_QUALITY
+    /** Lente, qualidade e modo noturno exigem religar a câmera; as demais configurações valem na hora. */
+    fun affectsCamera(key: String?) = key == KEY_LENS || key == KEY_QUALITY || key == KEY_NIGHT
 
     fun motionEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_MOTION, true)
 
@@ -103,6 +104,13 @@ object CameraSettings {
 
     fun setMotionVideo(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean(KEY_VIDEO, on).apply()
+    }
+
+    /** Modo noturno: exposição para lugar escuro e tela do celular apagada enquanto transmite. */
+    fun night(context: Context): Boolean = prefs(context).getBoolean(KEY_NIGHT, false)
+
+    fun setNight(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_NIGHT, on).apply()
     }
 
     /** Zoom pedido (1 = normal; abaixo de 1 usa a grande-angular, se houver). */

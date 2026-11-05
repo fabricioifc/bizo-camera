@@ -18,6 +18,7 @@ describe('valores do controle remoto', () => {
     });
     assert.deepEqual(changes, { lens: 'front', rotation: 90, torch: true, sensitivity: 'high' });
     assert.deepEqual(sanitizeChanges({ rotation: 45 }), {});
+    assert.deepEqual(sanitizeChanges({ night: true, video: 'não' }), { night: true });
     assert.deepEqual(sanitizeChanges({ zoom: 0.6 }), { zoom: 0.6 });
     assert.deepEqual(sanitizeChanges({ zoom: 1.2345 }), { zoom: 1.2 });
     assert.deepEqual(sanitizeChanges({ zoom: 50 }), {});

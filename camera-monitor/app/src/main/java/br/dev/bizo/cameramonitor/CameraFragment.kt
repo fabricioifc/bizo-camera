@@ -75,6 +75,7 @@ class CameraFragment : Fragment() {
             }
         )
         binding.torchSwitch.isChecked = CameraSettings.torch(context)
+        binding.nightSwitch.isChecked = CameraSettings.night(context)
         binding.motionSwitch.isChecked = CameraSettings.motionEnabled(context)
         binding.videoSwitch.isChecked = CameraSettings.motionVideo(context)
         binding.sensitivityGroup.check(
@@ -154,6 +155,7 @@ class CameraFragment : Fragment() {
             CameraSettings.setRotation(context, rotation)
         }
         binding.torchSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setTorch(context, checked) }
+        binding.nightSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setNight(context, checked) }
         binding.motionSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setMotionEnabled(context, checked) }
         binding.videoSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setMotionVideo(context, checked) }
         binding.sensitivityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->

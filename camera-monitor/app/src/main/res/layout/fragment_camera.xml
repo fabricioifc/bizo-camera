@@ -205,6 +205,20 @@
                     android:layout_marginTop="0dp"
                     android:text="@string/torch_hint" />
 
+                <com.google.android.material.divider.MaterialDivider style="@style/CardDivider" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/nightSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/night_switch"
+                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                <TextView
+                    style="@style/OptionHint"
+                    android:layout_marginTop="0dp"
+                    android:text="@string/night_hint" />
+
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>

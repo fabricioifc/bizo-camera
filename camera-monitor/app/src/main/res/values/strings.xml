@@ -74,6 +74,9 @@
     <string name="video_hint">Além da foto, grava cerca de 8 segundos (1 antes e 7 depois do movimento). Gasta mais dados e espaço no servidor.</string>
     <string name="torch_switch">Lanterna</string>
     <string name="torch_hint">Acende a luz do celular enquanto a câmera transmite. Só na câmera traseira.</string>
+    <string name="night_switch">Modo noturno</string>
+    <string name="night_hint">Clareia a imagem em lugar escuro (menos quadros por segundo, com mais exposição). Com a câmera ligada e o app aberto, a tela fica preta depois de 15 segundos sem toque.</string>
+    <string name="night_screen_hint">Modo noturno · toque para mostrar</string>
     <string name="sensitivity_low_hint">Só movimentos grandes, como uma pessoa passando perto.</string>
     <string name="sensitivity_medium_hint">Equilíbrio entre avisar logo e evitar alarmes falsos.</string>
     <string name="sensitivity_high_hint">Percebe movimentos pequenos; pode avisar por mudanças de luz.</string>

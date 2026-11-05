@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CaptureRequest
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
@@ -16,7 +18,12 @@ import android.os.Looper
 import android.os.PowerManager
 import android.util.Base64
 import android.util.Log
+import android.util.Range
 import android.view.OrientationEventListener
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
@@ -101,6 +108,9 @@ class StreamService : LifecycleService() {
     @Volatile private var sensitivity = Sensitivity.MEDIUM
     private var lastMotionCheckAt = 0L
     private var lastMotionSentAt = 0L
+    // Logo depois de ligar a câmera a exposição ainda está se ajustando (principalmente no modo
+    // noturno): a imagem clareando não conta como movimento.
+    @Volatile private var motionGraceUntil = 0L
 
     // Configuração alterada no app ou pelo site. Lente ou qualidade: troca a câmera sem parar a transmissão.
     // Movimento, rotação e lanterna: valem na hora. Em todos os casos, o site recebe o estado novo.
@@ -274,6 +284,7 @@ class StreamService : LifecycleService() {
     }
 
     // Liga (ou religa) a câmera com a lente e a qualidade salvas no app.
+    @OptIn(ExperimentalCamera2Interop::class)
     private fun startCamera() {
         val providerFuture = ProcessCameraProvider.getInstance(this)
         providerFuture.addListener({
@@ -282,14 +293,6 @@ class StreamService : LifecycleService() {
             val executor = analysisExecutor ?: Executors.newSingleThreadExecutor().also { analysisExecutor = it }
             quality = CameraSettings.quality(this)
 
-            val analysis = ImageAnalysis.Builder()
-                .setTargetResolution(quality.resolution)
-                .setTargetRotation(deviceRotation)
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                .build()
-                .also { it.setAnalyzer(executor) { image -> onFrame(image) } }
-
             // Também libera a prévia do app, se estiver aberta: a câmera só pode ter um dono.
             provider.unbindAll()
             // Lente e zoom: abaixo de 1×, a grande-angular (se o celular deixar usar).
@@ -297,6 +300,20 @@ class StreamService : LifecycleService() {
             CameraSettings.setZoomRange(this, choice.minZoom, choice.maxZoom)
             wideCameraId = choice.wideCameraId
             val selector = choice.selector
+            val night = CameraSettings.night(this)
+
+            val analysisBuilder = ImageAnalysis.Builder()
+                .setTargetResolution(quality.resolution)
+                .setTargetRotation(deviceRotation)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            // Modo noturno: deixa os quadros por segundo caírem, para cada um ficar exposto por mais tempo.
+            if (night) nightFpsRange(provider, selector)?.let { range ->
+                Camera2Interop.Extender(analysisBuilder)
+                    .setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, range)
+            }
+            val analysis = analysisBuilder.build()
+                .also { it.setAnalyzer(executor) { image -> onFrame(image) } }
             val capture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 .setTargetResolution(PHOTO_RESOLUTION)
@@ -313,8 +330,10 @@ class StreamService : LifecycleService() {
             this.camera = camera
             this.analysis = analysis
             camera.cameraControl.setZoomRatio(choice.ratio)
+            applyExposure(camera, night)
             // Câmera ou enquadramento novos: a próxima comparação de movimento recomeça do zero.
             motionDetector.reset()
+            motionGraceUntil = System.currentTimeMillis() + EXPOSURE_SETTLE_MS
             // A lanterna apaga ao trocar de câmera; acende de novo se estiver pedida.
             applyTorch()
             reportSettings()
@@ -350,6 +369,8 @@ class StreamService : LifecycleService() {
             // Movimento: confere duas vezes por segundo, mesmo sem ninguém assistindo.
             if (motionEnabled && RelayClient.connected && now - lastMotionCheckAt >= MOTION_CHECK_MS) {
                 lastMotionCheckAt = now
+                // Exposição se ajustando: só guarda a imagem como referência.
+                if (now < motionGraceUntil) motionDetector.reset()
                 val moved = motionDetector.update(image.lumaGrid(GRID_COLUMNS, GRID_ROWS), sensitivity.changedFraction)
                 if (moved && now - lastMotionSentAt >= MOTION_COOLDOWN_MS) {
                     lastMotionSentAt = now
@@ -430,6 +451,25 @@ class StreamService : LifecycleService() {
         }, ContextCompat.getMainExecutor(this))
     }
 
+    // Faixa de quadros por segundo do escuro, entre as que a câmera aceita.
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun nightFpsRange(provider: ProcessCameraProvider, selector: CameraSelector): Range<Int>? {
+        val info = runCatching { selector.filter(provider.availableCameraInfos).firstOrNull() }.getOrNull() ?: return null
+        val ranges = Camera2CameraInfo.from(info)
+            .getCameraCharacteristic(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+            ?.map { it.lower to it.upper } ?: return null
+        return NightMode.fpsRange(ranges)?.let { (min, max) -> Range(min, max) }
+    }
+
+    // Modo noturno: compensa a exposição para cima; fora dele, volta ao normal.
+    private fun applyExposure(camera: Camera, night: Boolean) {
+        val state = camera.cameraInfo.exposureState
+        if (!state.isExposureCompensationSupported) return
+        val range = state.exposureCompensationRange
+        val index = if (night) NightMode.exposureIndex(range.lower, range.upper) else 0
+        camera.cameraControl.setExposureCompensationIndex(index)
+    }
+
     // Lanterna: acende só se pedida e se a lente atual tiver flash (a frontal normalmente não tem).
     private fun applyTorch() {
         val current = camera ?: return
@@ -449,6 +489,7 @@ class StreamService : LifecycleService() {
         RemoteSettings.parseSensitivity(value("sensitivity"))?.let { CameraSettings.setSensitivity(this, it) }
         RemoteSettings.parseFlag(value("torch"))?.let { CameraSettings.setTorch(this, it) }
         RemoteSettings.parseFlag(value("video"))?.let { CameraSettings.setMotionVideo(this, it) }
+        RemoteSettings.parseFlag(value("night"))?.let { CameraSettings.setNight(this, it) }
         RemoteSettings.parseZoom(value("zoom"))?.let { CameraSettings.setZoom(this, it) }
         // Sem mudança de fato (ex.: valor igual ao atual), responde mesmo assim para o site se acertar.
         reportSettings()
@@ -465,6 +506,7 @@ class StreamService : LifecycleService() {
             .put("sensitivity", RemoteSettings.name(CameraSettings.sensitivity(this)))
             .put("torch", CameraSettings.torch(this))
             .put("video", CameraSettings.motionVideo(this))
+            .put("night", CameraSettings.night(this))
             .put("zoom", CameraSettings.zoom(this).toDouble())
             .put("zoomMin", CameraSettings.zoomRange(this).first.toDouble())
             .put("zoomMax", CameraSettings.zoomRange(this).second.toDouble())
@@ -548,6 +590,7 @@ class StreamService : LifecycleService() {
         private const val MOTION_COOLDOWN_MS = 30_000L
         private const val GRID_COLUMNS = 32
         private const val GRID_ROWS = 24
+        private const val EXPOSURE_SETTLE_MS = 3_000L
 
         @Volatile
         var isRunning = false

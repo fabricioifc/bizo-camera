@@ -64,6 +64,15 @@ class MainActivity : AppCompatActivity() {
     }
     private var exitHint: Snackbar? = null
 
+    // Modo noturno: com a câmera transmitindo, a tela fica preta depois de alguns segundos sem toque.
+    private val nightScreen by lazy {
+        NightScreen(this) { CameraSettings.night(this) && StreamService.isRunning && relay.isSignedIn }
+    }
+    private val nightRelayListener: () -> Unit = { runOnUiThread { nightScreen.refresh() } }
+    private val nightPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == CameraSettings.KEY_NIGHT) nightScreen.refresh()
+    }
+
     // Versão nova encontrada: avisa uma vez por abertura do app, com atalho para a aba Ajustes.
     private var updateHintShown = false
     private val updateListener: () -> Unit = {
@@ -134,11 +143,22 @@ class MainActivity : AppCompatActivity() {
         if (binding.bottomNav.selectedItemId != R.id.nav_home && shouldResumeStreaming()) {
             CameraStarter.start(this, relay, io) { error -> error?.let(::showMessage) }
         }
+        RelayClient.addListener(nightRelayListener)
+        CameraSettings.prefs(this).registerOnSharedPreferenceChangeListener(nightPrefsListener)
+        nightScreen.resume()
     }
 
     override fun onPause() {
         AppUpdater.removeListener(updateListener)
+        RelayClient.removeListener(nightRelayListener)
+        CameraSettings.prefs(this).unregisterOnSharedPreferenceChangeListener(nightPrefsListener)
+        nightScreen.pause()
         super.onPause()
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        nightScreen.onUserInteraction()
     }
 
     override fun onStop() {

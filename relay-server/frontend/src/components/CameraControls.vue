@@ -167,6 +167,29 @@ function set(key, value) {
         </div>
       </div>
 
+      <!-- Modo noturno (versões antigas do app não informam: fica desativado) -->
+      <div class="controls-section">
+        <div class="switch-row">
+          <span class="switch-text">
+            <span class="control-label"><AppIcon name="moon" :size="16" /> Modo noturno</span>
+            <span class="control-hint">
+              {{ settings.night === undefined
+                ? 'Atualize o app do celular para usar.'
+                : 'Clareia a imagem no escuro e apaga a tela do celular.' }}
+            </span>
+          </span>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            :aria-checked="settings.night === true"
+            aria-label="Modo noturno"
+            :disabled="settings.night === undefined"
+            @click="set('night', !settings.night)"
+          ></button>
+        </div>
+      </div>
+
       <!-- Detecção de movimento -->
       <div class="controls-section">
         <div class="switch-row">

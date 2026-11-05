@@ -10,8 +10,8 @@ const CHOICES = {
   sensitivity: ['low', 'medium', 'high'],
   rotation: [0, 90, 180, 270],
 };
-// video: gravar o vídeo curto do movimento.
-const FLAGS = ['motion', 'torch', 'video'];
+// video: gravar o vídeo curto do movimento; night: modo noturno (exposição e tela apagada).
+const FLAGS = ['motion', 'torch', 'video', 'night'];
 
 // Zoom: número entre 0,1 e 20, com uma casa decimal (abaixo de 1 usa a grande-angular, se houver).
 function zoomValue(value) {
