@@ -15,18 +15,23 @@ val keystoreProps = Properties().apply {
 // -PrelayUrl=https://outro.dominio na linha de comando, ou relayUrl=... em ~/.gradle/gradle.properties.
 val relayUrl: String = (findProperty("relayUrl") as String?) ?: "https://camera.bizo.dev.br"
 
+// Client ID do tipo "Aplicativo da Web" no Google Cloud (o mesmo GOOGLE_CLIENT_ID do servidor).
+// Informe com -PgoogleServerClientId=... ou em ~/.gradle/gradle.properties.
+val googleServerClientId: String = (findProperty("googleServerClientId") as String?) ?: ""
+
 android {
-    namespace = "com.example.cameramonitor"
+    namespace = "br.dev.bizo.cameramonitor"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.cameramonitor"
+        applicationId = "br.dev.bizo.cameramonitor"
         minSdk = 24
         targetSdk = 34
         versionCode = 2
         versionName = "0.2.0"
 
         buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
+        buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
     }
 
     signingConfigs {
@@ -69,6 +74,10 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("androidx.lifecycle:lifecycle-service:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")

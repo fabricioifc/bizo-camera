@@ -1,4 +1,4 @@
-package com.example.cameramonitor
+package br.dev.bizo.cameramonitor
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -158,7 +158,7 @@ class StreamService : LifecycleService() {
 
     companion object {
         private const val TAG = "StreamService"
-        const val ACTION_STOP = "com.example.cameramonitor.STOP"
+        const val ACTION_STOP = "br.dev.bizo.cameramonitor.STOP"
         private const val CHANNEL_ID = "stream"
         private const val NOTIFICATION_ID = 1
         private const val JPEG_QUALITY = 60

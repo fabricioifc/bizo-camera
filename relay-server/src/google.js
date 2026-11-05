@@ -72,7 +72,8 @@ async function signingKeys() {
   return certsCache.keys;
 }
 
-// Valida assinatura, emissor, audiência, validade e nonce do ID token.
+// Valida assinatura, emissor, audiência, validade e (se informado) o nonce do ID token.
+// O login nativo do app não usa nonce; o da web usa.
 async function verifyIdToken(idToken, { clientId, nonce }) {
   const [headerPart, payloadPart, signaturePart] = idToken.split('.');
   if (!signaturePart) throw new Error('malformed_token');
@@ -95,7 +96,7 @@ async function verifyIdToken(idToken, { clientId, nonce }) {
   if (!ISSUERS.includes(payload.iss)) throw new Error('bad_issuer');
   if (payload.aud !== clientId) throw new Error('bad_audience');
   if (!payload.exp || payload.exp * 1000 < Date.now()) throw new Error('token_expired');
-  if (payload.nonce !== nonce) throw new Error('bad_nonce');
+  if (nonce !== undefined && payload.nonce !== nonce) throw new Error('bad_nonce');
   if (payload.email_verified !== true) throw new Error('email_not_verified');
   if (!payload.sub || !payload.email) throw new Error('missing_claims');
   return { sub: payload.sub, email: payload.email };

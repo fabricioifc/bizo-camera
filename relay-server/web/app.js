@@ -10,8 +10,6 @@
     security: document.getElementById('security'),
     logout: document.getElementById('logout'),
     authMessage: document.getElementById('auth-message'),
-    googleButton: document.getElementById('google-button'),
-    appLink: document.getElementById('app-link'),
     mfaForm: document.getElementById('mfa-form'),
     mfaCode: document.getElementById('mfa-code'),
     mfaCancel: document.getElementById('mfa-cancel'),
@@ -48,8 +46,6 @@
   let pendingMfaToken = null;
   let signedIn = false;
   let pendingSetup = false; // sessão do Google sem 2FA: só a tela de segurança é liberada
-  // ?app=1: o login veio do app Android, que recebe a sessão pelo link monitor://.
-  const appMode = new URLSearchParams(location.search).get('app') === '1';
 
   const MESSAGES = {
     account_locked: 'Conta bloqueada por 15 minutos após muitas senhas erradas.',
@@ -109,30 +105,6 @@
     loadDevices();
   }
 
-  // Login concluído: no modo app, devolve a sessão ao app; na web, mostra a lista.
-  function finishAuth() {
-    if (appMode && !pendingSetup) return handoffToApp();
-    return showList();
-  }
-
-  async function handoffToApp() {
-    signedIn = true;
-    showView('auth-view');
-    setMessage(els.authMessage, 'Voltando para o app…');
-    try {
-      const res = await api('/api/auth/app-code', { method: 'POST' });
-      if (!res.ok) throw new Error(await errorText(res));
-      const { code } = await res.json();
-      const link = `monitor://auth?code=${encodeURIComponent(code)}`;
-      els.appLink.href = link;
-      els.appLink.hidden = false;
-      els.googleButton.hidden = true;
-      location.href = link;
-    } catch (err) {
-      setMessage(els.authMessage, err.message, true);
-    }
-  }
-
   // ----- Segundo fator (depois do login pelo Google) -----
 
   els.mfaForm.addEventListener('submit', async (event) => {
@@ -158,7 +130,7 @@
       pendingMfaToken = null;
       els.mfaCode.value = '';
       signedIn = true;
-      finishAuth();
+      showList();
     } catch {
       setMessage(els.mfaMessage, 'Sem conexão com o servidor.', true);
     } finally {
@@ -261,7 +233,7 @@
   // Depois de guardar os códigos, a sessão já está completa: vai para a lista.
   els.recoveryDone.addEventListener('click', () => {
     pendingSetup = false;
-    finishAuth();
+    showList();
   });
 
   els.disableForm.addEventListener('submit', async (event) => {
@@ -432,15 +404,13 @@
       return;
     }
 
-    if (appMode) els.googleButton.href = '/api/auth/google/start?app=1';
-
     try {
       const res = await api('/api/auth/me');
       if (res.ok) {
         const me = await res.json();
         signedIn = true;
         pendingSetup = me.pending;
-        return finishAuth();
+        return showList();
       }
     } catch {
       setConnection(false);

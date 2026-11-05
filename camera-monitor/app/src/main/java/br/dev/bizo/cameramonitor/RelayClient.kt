@@ -1,4 +1,4 @@
-package com.example.cameramonitor
+package br.dev.bizo.cameramonitor
 
 import android.content.Context
 import android.os.Build
@@ -17,9 +17,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Cuida da conta e da conexão com o servidor de retransmissão.
  *
- * Fluxo: o usuário entra com e-mail e senha uma vez, o app registra este
- * aparelho na conta e guarda o segredo da câmera. Depois disso, a câmera
- * conecta sozinha sempre que o app estiver rodando.
+ * Fluxo: o usuário entra com a conta Google uma vez (e confirma o 2FA), o app
+ * registra este aparelho na conta e guarda o segredo da câmera. Depois disso,
+ * a câmera conecta sozinha sempre que o app estiver rodando.
  *
  * Todas as chamadas de rede bloqueiam: chame sempre fora da thread principal.
  */
@@ -39,21 +39,61 @@ class RelayClient(context: Context) {
     val isSignedIn: Boolean get() = prefs.contains(KEY_SESSION)
     val isRegistered: Boolean get() = prefs.contains(KEY_ID) && prefs.contains(KEY_SECRET)
 
-    /** Página de login com o Google. Abre no navegador; o retorno volta ao app pelo link monitor://. */
-    val loginUrl: String get() = "$baseUrl/api/auth/google/start?app=1"
+    sealed class LoginResult {
+        object Done : LoginResult()
+        class NeedsCode(val mfaToken: String) : LoginResult()
+        object NeedsSetup : LoginResult()
+        object Failed : LoginResult()
+    }
 
-    /** Troca o código de uso único (recebido pelo link monitor://) por uma sessão deste aparelho. */
-    fun exchangeCode(code: String): Boolean {
-        val body = JSONObject().put("code", code).toString()
-        val response = post("/api/auth/app-token", body, session = null) ?: return false
-        saveSession(response)
+    // Sessão da conta sem 2FA ativo: só serve para configurar o 2FA. Fica só na memória.
+    private var setupToken: String? = null
+    private var setupEmail: String? = null
+
+    /** Entra com o ID token do Google (obtido pelo Credential Manager). */
+    fun signInWithGoogle(idToken: String): LoginResult {
+        val body = JSONObject().put("idToken", idToken).toString()
+        val response = post("/api/auth/google/app", body, session = null) ?: return LoginResult.Failed
+        if (response.optBoolean("mfaRequired")) return LoginResult.NeedsCode(response.getString("mfaToken"))
+        if (response.optBoolean("pending")) {
+            setupToken = response.getString("token")
+            setupEmail = response.getString("email")
+            return LoginResult.NeedsSetup
+        }
+        saveSession(response.getString("token"), response.getString("email"))
+        return LoginResult.Done
+    }
+
+    /** Segundo passo do login: o código do app autenticador ou um código de recuperação. */
+    fun verifyCode(mfaToken: String, code: String): Boolean {
+        val body = JSONObject().put("mfaToken", mfaToken).put("code", code).toString()
+        val response = post("/api/auth/mfa", body, session = null) ?: return false
+        saveSession(response.getString("token"), response.getString("email"))
         return true
     }
 
-    private fun saveSession(login: JSONObject) {
-        val owner = login.getString("email")
+    /** Gera o segredo do 2FA. Devolve o QR code (data URL PNG) e a chave em texto. */
+    fun startTwoFactorSetup(): Pair<String, String>? {
+        val token = setupToken ?: return null
+        val response = post("/api/account/2fa/setup", "{}", token) ?: return null
+        return response.getString("qr") to response.getString("secret")
+    }
+
+    /** Confirma o código do app e ativa o 2FA. Devolve os códigos de recuperação, ou null se o código estiver errado. */
+    fun confirmTwoFactor(code: String): List<String>? {
+        val token = setupToken ?: return null
+        val body = JSONObject().put("code", code).toString()
+        val response = post("/api/account/2fa/enable", body, token) ?: return null
+        saveSession(token, setupEmail ?: return null)
+        setupToken = null
+        setupEmail = null
+        val array = response.getJSONArray("recoveryCodes")
+        return List(array.length()) { array.getString(it) }
+    }
+
+    private fun saveSession(token: String, owner: String) {
         val editor = prefs.edit()
-            .putString(KEY_SESSION, login.getString("token"))
+            .putString(KEY_SESSION, token)
             .putString(KEY_EMAIL, owner)
         // Câmera registrada por outra conta (ou pela versão antiga do app) não pertence a esta.
         if (prefs.getString(KEY_OWNER, null) != owner) editor.remove(KEY_ID).remove(KEY_SECRET)

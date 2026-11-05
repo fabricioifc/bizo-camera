@@ -90,11 +90,10 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 
 - `GET /api/config`: diz se o cadastro está aberto (`signupOpen`) e se o Google está ativo (`googleEnabled`).
 - `POST /api/auth/mfa`: segunda etapa do login pelo Google, com `mfaToken` e `code` (app ou recuperação).
-- `POST /api/auth/app-code`: a web, já logada, pede um código de uso único (60 segundos) para entregar a sessão ao app.
-- `POST /api/auth/app-token`: o app troca o código por um token de sessão próprio.
 - `POST /api/auth/logout`: encerra a sessão.
 - `GET /api/auth/me`: dados da conta logada (`email`, `google`, `twoFactor`, `pending`).
-- `GET /api/auth/google/start` e `GET /api/auth/google/callback`: fluxo do login com Google.
+- `GET /api/auth/google/start` e `GET /api/auth/google/callback`: fluxo do login com Google pela web.
+- `POST /api/auth/google/app`: login do app Android. Recebe o `idToken` do Google e responde `{ token, email, pending }`, ou `{ mfaRequired, mfaToken }` se a conta tiver 2FA. Sem 2FA ativo, `pending: true` e o app precisa configurar o 2FA com o token antes de usar as câmeras.
 - `POST /api/account/2fa/setup`: gera o segredo do 2FA e o QR code.
 - `POST /api/account/2fa/enable`: confirma o código e devolve os códigos de recuperação.
 - `POST /api/account/2fa/disable`: desativa o 2FA com senha (se houver) e um código.

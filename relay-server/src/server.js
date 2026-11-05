@@ -19,13 +19,11 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_ENABLED = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
 // Cookie "Secure" só quando o site é HTTPS; em teste local (http) o navegador ignoraria o cookie.
 const SECURE_COOKIES = PUBLIC_URL.startsWith('https://');
-const APP_SCHEME = 'monitor://auth';
 const ISSUER = 'Monitor de Câmera';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MFA_TTL_MS = 5 * 60 * 1000;
 const OAUTH_TTL_MS = 10 * 60 * 1000;
-const APP_CODE_TTL_MS = 60 * 1000;
 const MAX_MFA_ATTEMPTS = 5;
 const MAX_CODE_FAILURES = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -45,8 +43,7 @@ const deviceSockets = new Map(); // deviceId -> WebSocket da câmera
 const viewerSockets = new Map(); // deviceId -> Set<WebSocket> dos visualizadores
 const rateBuckets = new Map(); // chave -> { count, resetAt }
 const pendingMfa = new Map(); // sha256(mfaToken) -> { email, expiresAt, attempts }
-const pendingOauth = new Map(); // state -> { verifier, nonce, app, expiresAt }
-const appCodes = new Map(); // sha256(code) -> { userId, expiresAt }; troca única por token do app
+const pendingOauth = new Map(); // state -> { verifier, nonce, expiresAt }
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const randomHex = (bytes) => crypto.randomBytes(bytes).toString('hex');
@@ -255,13 +252,6 @@ function createMfaChallenge(email) {
   return token;
 }
 
-// Código de uso único, trocado pelo app por um token de sessão próprio.
-function createAppCode(userId) {
-  const code = randomHex(24);
-  appCodes.set(sha256(code), { userId, expiresAt: Date.now() + APP_CODE_TTL_MS });
-  return code;
-}
-
 async function handleApi(req, res, url) {
   const route = `${req.method} ${url.pathname}`;
   const token = requestToken(req);
@@ -300,25 +290,26 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { token: session, email: challenge.email }, { 'Set-Cookie': sessionCookie(session) });
   }
 
-  // A página web, já logada, pede um código para entregar a sessão ao app Android.
-  if (route === 'POST /api/auth/app-code') {
-    const userId = sessionUserId(token);
-    if (!userId) return sendJson(res, 401, { error: 'unauthorized' });
-    if (sessionPending(token)) return sendJson(res, 403, { error: 'two_factor_required' });
-    return sendJson(res, 200, { code: createAppCode(userId) });
-  }
-
-  // O app troca o código de uso único por um token de sessão próprio.
-  if (route === 'POST /api/auth/app-token') {
-    if (rateLimited(req, 'app-token', 20)) return sendJson(res, 429, { error: 'too_many_requests' });
+  // Login nativo do app: recebe o ID token do Google (obtido pelo Credential Manager).
+  if (route === 'POST /api/auth/google/app') {
+    if (!GOOGLE_ENABLED) return sendJson(res, 404, { error: 'not_found' });
+    if (rateLimited(req, 'google-app', 20)) return sendJson(res, 429, { error: 'too_many_requests' });
     const body = await readJson(req);
-    const key = typeof body.code === 'string' ? sha256(body.code) : '';
-    const grant = appCodes.get(key);
-    appCodes.delete(key);
-    if (!grant || grant.expiresAt < Date.now()) return sendJson(res, 401, { error: 'code_expired' });
-    const entry = userById(grant.userId);
-    if (!entry) return sendJson(res, 401, { error: 'unauthorized' });
-    return sendJson(res, 200, { token: createSession(grant.userId), email: entry.email });
+    let claims;
+    try {
+      claims = await google.verifyIdToken(String(body.idToken || ''), { clientId: GOOGLE_CLIENT_ID });
+    } catch {
+      return sendJson(res, 401, { error: 'invalid_google_token' });
+    }
+    const entry = resolveGoogleAccount(claims);
+    if (!entry) return sendJson(res, 403, { error: 'signup_disabled' });
+    const [email, user] = entry;
+    if (twoFactorEnabled(user)) {
+      return sendJson(res, 200, { mfaRequired: true, mfaToken: createMfaChallenge(email) });
+    }
+    // Sem 2FA ativo, a sessão fica pendente: o app precisa configurar o 2FA antes de usar as câmeras.
+    const session = createSession(user.id, true);
+    return sendJson(res, 200, { token: session, email, pending: true });
   }
 
   if (route === 'POST /api/auth/logout') {
@@ -413,8 +404,7 @@ async function handleApi(req, res, url) {
   return sendJson(res, 404, { error: 'not_found' });
 }
 
-// Login com Google: inicia o fluxo e recebe o retorno do Google.
-// Com app=1, o retorno vai para o app Android (web ou link monitor://).
+// Login com Google pela web: inicia o fluxo e recebe o retorno do Google.
 function handleGoogle(req, res, url) {
   if (!GOOGLE_ENABLED) return sendJson(res, 404, { error: 'not_found' });
   const redirectUri = `${PUBLIC_URL}/api/auth/google/callback`;
@@ -425,7 +415,6 @@ function handleGoogle(req, res, url) {
     pendingOauth.set(attempt.state, {
       verifier: attempt.verifier,
       nonce: attempt.nonce,
-      app: url.searchParams.get('app') === '1',
       expiresAt: Date.now() + OAUTH_TTL_MS,
     });
     return redirect(res, google.authorizationUrl({ clientId: GOOGLE_CLIENT_ID, redirectUri, attempt }));
@@ -437,18 +426,31 @@ function handleGoogle(req, res, url) {
   pendingOauth.delete(state);
   const code = url.searchParams.get('code');
   if (!attempt || attempt.expiresAt < Date.now() || !code || url.searchParams.get('error')) {
-    return redirect(res, failureTarget(attempt, 'error=google'));
+    return redirect(res, '/#error=google');
   }
 
   return finishGoogleLogin(res, { code, attempt, redirectUri }).catch(() => {
-    if (!res.headersSent) redirect(res, failureTarget(attempt, 'error=google'));
+    if (!res.headersSent) redirect(res, '/#error=google');
   });
 }
 
-// Destino de erro: o app recebe pelo link monitor://, a web pelo fragmento.
-function failureTarget(attempt, reason) {
-  if (attempt && attempt.app) return `${APP_SCHEME}?error=${reason.replace('error=', '')}`;
-  return `/#${reason}`;
+// Conta do Google: vincula a uma conta com o mesmo e-mail (confirmado pelo Google) ou cria uma nova.
+// Retorna [email, user] ou null se o cadastro estiver fechado.
+function resolveGoogleAccount(claims) {
+  const email = normalizeEmail(claims.email);
+  let entry = Object.entries(store.data.users).find(([, user]) => user.googleId === claims.sub);
+  if (!entry && store.data.users[email]) {
+    store.data.users[email].googleId = claims.sub;
+    entry = [email, store.data.users[email]];
+  }
+  if (!entry) {
+    if (!signupOpen()) return null;
+    const user = { id: randomHex(8), googleId: claims.sub, createdAt: Date.now(), failures: 0, lockedUntil: 0 };
+    store.data.users[email] = user;
+    entry = [email, user];
+  }
+  store.save();
+  return entry;
 }
 
 async function finishGoogleLogin(res, { code, attempt, redirectUri }) {
@@ -460,32 +462,18 @@ async function finishGoogleLogin(res, { code, attempt, redirectUri }) {
     verifier: attempt.verifier,
   });
   const claims = await google.verifyIdToken(idToken, { clientId: GOOGLE_CLIENT_ID, nonce: attempt.nonce });
-  const email = normalizeEmail(claims.email);
-
-  // Conta já vinculada ao Google, ou conta com o mesmo e-mail (confirmado pelo Google).
-  let entry = Object.entries(store.data.users).find(([, user]) => user.googleId === claims.sub);
-  if (!entry && store.data.users[email]) {
-    store.data.users[email].googleId = claims.sub;
-    entry = [email, store.data.users[email]];
-  }
-  if (!entry) {
-    if (!signupOpen()) return redirect(res, failureTarget(attempt, 'error=signup_disabled'));
-    const user = { id: randomHex(8), googleId: claims.sub, createdAt: Date.now(), failures: 0, lockedUntil: 0 };
-    store.data.users[email] = user;
-    entry = [email, user];
-  }
-  store.save();
+  const entry = resolveGoogleAccount(claims);
+  if (!entry) return redirect(res, '/#error=signup_disabled');
 
   const [accountEmail, user] = entry;
-  const base = attempt.app ? '/?app=1' : '/';
   if (twoFactorEnabled(user)) {
     // O 2FA da conta continua valendo depois do Google. O código vai no fragmento da URL,
     // que o navegador não envia ao servidor.
-    return redirect(res, `${base}#mfa=${createMfaChallenge(accountEmail)}`);
+    return redirect(res, `/#mfa=${createMfaChallenge(accountEmail)}`);
   }
   // Login pelo Google exige 2FA. Sem 2FA ativo, a sessão fica pendente até a configuração.
-  const token = createSession(user.id, !twoFactorEnabled(user));
-  return redirect(res, base, { 'Set-Cookie': sessionCookie(token) });
+  const token = createSession(user.id, true);
+  return redirect(res, '/', { 'Set-Cookie': sessionCookie(token) });
 }
 
 function serveStatic(pathname, res) {
@@ -514,7 +502,7 @@ function serveStatic(pathname, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
-    if (url.pathname.startsWith('/api/auth/google/')) {
+    if (url.pathname === '/api/auth/google/start' || url.pathname === '/api/auth/google/callback') {
       handleGoogle(req, res, url);
     } else if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
@@ -647,7 +635,6 @@ setInterval(() => {
   if (changed) store.save();
   for (const [key, challenge] of pendingMfa) if (challenge.expiresAt < now) pendingMfa.delete(key);
   for (const [key, attempt] of pendingOauth) if (attempt.expiresAt < now) pendingOauth.delete(key);
-  for (const [key, grant] of appCodes) if (grant.expiresAt < now) appCodes.delete(key);
   for (const [key, bucket] of rateBuckets) if (bucket.resetAt < now) rateBuckets.delete(key);
 }, 10 * 60 * 1000);
 
