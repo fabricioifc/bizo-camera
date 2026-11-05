@@ -17,10 +17,12 @@ const LEVELS = [
   { value: 'medium', label: 'Média' },
   { value: 'high', label: 'Alta' },
 ];
-const ROTATIONS = [0, 90, 180, 270].map((value) => ({ value, label: `${value}°` }));
-const ON_OFF = [
-  { value: true, label: 'Ligada' },
-  { value: false, label: 'Desligada' },
+// A câmera guarda 0, 90, 180 ou 270 graus; 270 aparece como −90 (girar para a esquerda).
+const ROTATIONS = [
+  { value: 270, label: '−90°' },
+  { value: 0, label: '0°' },
+  { value: 90, label: '90°' },
+  { value: 180, label: '180°' },
 ];
 
 function set(key, value) {
@@ -29,112 +31,127 @@ function set(key, value) {
 </script>
 
 <template>
-  <section class="card" aria-labelledby="controls-title">
+  <section class="card controls-card" aria-labelledby="controls-title">
     <div class="card-header">
       <div>
-        <h2 id="controls-title">Controles da câmera</h2>
-        <p class="small muted">As mudanças valem na hora e ficam salvas no celular.</p>
+        <h2 id="controls-title">Controles</h2>
+        <p class="small muted">Valem na hora e ficam salvos no celular.</p>
       </div>
     </div>
 
-    <p v-if="!online" class="controls-empty muted">Disponível quando a câmera estiver online.</p>
-    <p v-else-if="!settings" class="controls-empty muted">
-      Aguardando a câmera. Atualize o app no celular se esta mensagem não sumir.
-    </p>
+    <div v-if="!online" class="controls-empty">
+      <AppIcon name="camera" :size="22" />
+      <span>Disponíveis quando a câmera estiver online.</span>
+    </div>
+    <div v-else-if="!settings" class="controls-empty">
+      <AppIcon name="refresh" :size="22" />
+      <span>Aguardando a câmera. Se não aparecer, atualize o app no celular.</span>
+    </div>
 
-    <div v-else class="controls">
-      <div class="control">
-        <span class="control-label">Câmera</span>
-        <div class="segmented" role="group" aria-label="Câmera">
-          <button
-            v-for="option in LENS"
-            :key="option.value"
-            type="button"
-            :class="{ active: settings.lens === option.value }"
-            :aria-pressed="settings.lens === option.value"
-            @click="set('lens', option.value)"
-          >{{ option.label }}</button>
+    <template v-else>
+      <!-- Imagem -->
+      <div class="controls-section">
+        <h3 class="controls-title">Imagem</h3>
+
+        <div class="control">
+          <span class="control-label">Câmera</span>
+          <div class="segmented" role="group" aria-label="Câmera">
+            <button
+              v-for="option in LENS"
+              :key="option.value"
+              type="button"
+              :class="{ active: settings.lens === option.value }"
+              :aria-pressed="settings.lens === option.value"
+              @click="set('lens', option.value)"
+            >{{ option.label }}</button>
+          </div>
+        </div>
+
+        <div class="control">
+          <span class="control-label">Rotação</span>
+          <div class="segmented" role="group" aria-label="Rotação">
+            <button
+              v-for="option in ROTATIONS"
+              :key="option.value"
+              type="button"
+              :class="{ active: settings.rotation === option.value }"
+              :aria-pressed="settings.rotation === option.value"
+              @click="set('rotation', option.value)"
+            >{{ option.label }}</button>
+          </div>
+          <span class="control-hint">Para o celular preso de lado ou de cabeça para baixo.</span>
+        </div>
+
+        <div class="control">
+          <span class="control-label">Qualidade</span>
+          <div class="segmented" role="group" aria-label="Qualidade">
+            <button
+              v-for="option in LEVELS"
+              :key="option.value"
+              type="button"
+              :class="{ active: settings.quality === option.value }"
+              :aria-pressed="settings.quality === option.value"
+              @click="set('quality', option.value)"
+            >{{ option.label }}</button>
+          </div>
         </div>
       </div>
 
-      <div class="control">
-        <span class="control-label">Rotação</span>
-        <div class="segmented" role="group" aria-label="Rotação">
+      <!-- Lanterna -->
+      <div class="controls-section">
+        <div class="switch-row">
+          <span class="switch-text">
+            <span class="control-label"><AppIcon name="sun" :size="16" /> Lanterna</span>
+            <span class="control-hint">
+              {{ settings.torchAvailable ? 'Acende a luz do celular.' : 'Esta câmera não tem lanterna.' }}
+            </span>
+          </span>
           <button
-            v-for="option in ROTATIONS"
-            :key="option.value"
             type="button"
-            :class="{ active: settings.rotation === option.value }"
-            :aria-pressed="settings.rotation === option.value"
-            @click="set('rotation', option.value)"
-          >{{ option.label }}</button>
-        </div>
-      </div>
-
-      <div class="control">
-        <span class="control-label">Qualidade</span>
-        <div class="segmented" role="group" aria-label="Qualidade">
-          <button
-            v-for="option in LEVELS"
-            :key="option.value"
-            type="button"
-            :class="{ active: settings.quality === option.value }"
-            :aria-pressed="settings.quality === option.value"
-            @click="set('quality', option.value)"
-          >{{ option.label }}</button>
-        </div>
-      </div>
-
-      <div class="control">
-        <span class="control-label">
-          <AppIcon name="sun" :size="14" />
-          Lanterna
-        </span>
-        <div class="segmented" role="group" aria-label="Lanterna">
-          <button
-            v-for="option in ON_OFF"
-            :key="String(option.value)"
-            type="button"
-            :class="{ active: settings.torch === option.value }"
-            :aria-pressed="settings.torch === option.value"
+            class="switch"
+            role="switch"
+            :aria-checked="settings.torch"
+            aria-label="Lanterna"
             :disabled="!settings.torchAvailable"
-            @click="set('torch', option.value)"
-          >{{ option.label }}</button>
-        </div>
-        <span v-if="!settings.torchAvailable" class="small muted">Sem lanterna nesta câmera.</span>
-      </div>
-
-      <div class="control">
-        <span class="control-label">
-          <AppIcon name="motion" :size="14" />
-          Detecção de movimento
-        </span>
-        <div class="segmented" role="group" aria-label="Detecção de movimento">
-          <button
-            v-for="option in ON_OFF"
-            :key="String(option.value)"
-            type="button"
-            :class="{ active: settings.motion === option.value }"
-            :aria-pressed="settings.motion === option.value"
-            @click="set('motion', option.value)"
-          >{{ option.label }}</button>
+            @click="set('torch', !settings.torch)"
+          ></button>
         </div>
       </div>
 
-      <div class="control">
-        <span class="control-label">Sensibilidade</span>
-        <div class="segmented" role="group" aria-label="Sensibilidade">
+      <!-- Detecção de movimento -->
+      <div class="controls-section">
+        <div class="switch-row">
+          <span class="switch-text">
+            <span class="control-label"><AppIcon name="motion" :size="16" /> Detecção de movimento</span>
+            <span class="control-hint">
+              {{ settings.motion ? 'Guarda uma foto e avisa a cada movimento.' : 'Nenhum movimento é registrado.' }}
+            </span>
+          </span>
           <button
-            v-for="option in LEVELS"
-            :key="option.value"
             type="button"
-            :class="{ active: settings.sensitivity === option.value }"
-            :aria-pressed="settings.sensitivity === option.value"
-            :disabled="!settings.motion"
-            @click="set('sensitivity', option.value)"
-          >{{ option.label }}</button>
+            class="switch"
+            role="switch"
+            :aria-checked="settings.motion"
+            aria-label="Detecção de movimento"
+            @click="set('motion', !settings.motion)"
+          ></button>
+        </div>
+
+        <div class="control">
+          <span class="control-label">Sensibilidade</span>
+          <div class="segmented" role="group" aria-label="Sensibilidade">
+            <button
+              v-for="option in LEVELS"
+              :key="option.value"
+              type="button"
+              :class="{ active: settings.sensitivity === option.value }"
+              :aria-pressed="settings.sensitivity === option.value"
+              :disabled="!settings.motion"
+              @click="set('sensitivity', option.value)"
+            >{{ option.label }}</button>
+          </div>
         </div>
       </div>
-    </div>
+    </template>
   </section>
 </template>

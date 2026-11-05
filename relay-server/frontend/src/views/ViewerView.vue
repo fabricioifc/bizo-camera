@@ -22,6 +22,10 @@ const events = ref([]);
 const eventsLoaded = ref(false);
 // Configurações informadas pela câmera (controle remoto); null até ela responder.
 const settings = ref(null);
+// Abas: "live" (imagem e controles) ou "events" (fotos dos movimentos).
+const tab = ref('live');
+// Movimentos que chegaram enquanto a aba Movimentos estava fechada.
+const unseen = ref(0);
 
 const pill = computed(() => {
   if (!connected.value) return { text: 'Conectando', kind: 'warning' };
@@ -69,6 +73,7 @@ function handleMessage(text) {
   } else if (message.type === 'motion') {
     events.value.unshift(message.event);
     eventsLoaded.value = true;
+    if (tab.value !== 'events') unseen.value += 1;
   }
 }
 
@@ -95,6 +100,11 @@ function connect() {
       if (!closed) connect();
     }, RECONNECT_MS);
   };
+}
+
+function showTab(next) {
+  tab.value = next;
+  if (next === 'events') unseen.value = 0;
 }
 
 // Controle remoto: pede a mudança à câmera e já mostra o valor novo; a resposta dela confirma.
@@ -144,17 +154,44 @@ onBeforeUnmount(() => {
     </template>
   </PageHeader>
 
-  <div class="viewer">
-    <div class="viewer-main">
-      <div class="stage">
-        <img v-if="frameUrl" :src="frameUrl" alt="Transmissão ao vivo">
-        <div v-else class="stage-status">
-          <AppIcon name="camera" :size="36" />
-          <span>{{ status }}</span>
-        </div>
-      </div>
-      <CameraControls :settings="settings" :online="online && connected" @change="configure" />
-    </div>
-    <MotionEvents :events="events" :loaded="eventsLoaded" />
+  <div class="tabs" role="tablist" aria-label="Seções da câmera">
+    <button
+      type="button"
+      role="tab"
+      class="tab"
+      :class="{ active: tab === 'live' }"
+      :aria-selected="tab === 'live'"
+      @click="showTab('live')"
+    >
+      <AppIcon name="camera" :size="18" />
+      Ao vivo
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="tab"
+      :class="{ active: tab === 'events' }"
+      :aria-selected="tab === 'events'"
+      @click="showTab('events')"
+    >
+      <AppIcon name="motion" :size="18" />
+      Movimentos
+      <span v-if="unseen" class="tab-badge" :aria-label="`${unseen} novos`">{{ unseen }}</span>
+      <span v-else-if="events.length" class="tab-count">{{ events.length }}</span>
+    </button>
   </div>
+
+  <!-- A conexão continua aberta nas duas abas: a imagem volta na hora ao trocar. -->
+  <div v-show="tab === 'live'" class="live">
+    <div class="stage">
+      <img v-if="frameUrl" :src="frameUrl" alt="Transmissão ao vivo">
+      <div v-else class="stage-status">
+        <AppIcon name="camera" :size="36" />
+        <span>{{ status }}</span>
+      </div>
+    </div>
+    <CameraControls :settings="settings" :online="online && connected" @change="configure" />
+  </div>
+
+  <MotionEvents v-show="tab === 'events'" :events="events" :loaded="eventsLoaded" />
 </template>

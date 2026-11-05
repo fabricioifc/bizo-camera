@@ -61,7 +61,8 @@
     <string name="rotation_0">0°</string>
     <string name="rotation_90">90°</string>
     <string name="rotation_180">180°</string>
-    <string name="rotation_270">270°</string>
+    <!-- 270° aparece como −90° (girar para a esquerda), igual ao site. -->
+    <string name="rotation_270">−90°</string>
     <string name="rotation_hint">Gira a imagem enviada ao site e as fotos de movimento. Use se o celular estiver preso de lado ou de cabeça para baixo.</string>
     <string name="torch_switch">Lanterna</string>
     <string name="torch_hint">Acende a luz do celular enquanto a câmera transmite. Só na câmera traseira.</string>

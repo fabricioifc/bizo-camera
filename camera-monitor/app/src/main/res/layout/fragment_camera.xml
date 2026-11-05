@@ -98,6 +98,11 @@
                     style="@style/ChoiceGroup">
 
                     <com.google.android.material.button.MaterialButton
+                        android:id="@+id/rotation270"
+                        style="@style/ChoiceButton"
+                        android:text="@string/rotation_270" />
+
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/rotation0"
                         style="@style/ChoiceButton"
                         android:text="@string/rotation_0" />
@@ -111,11 +116,6 @@
                         android:id="@+id/rotation180"
                         style="@style/ChoiceButton"
                         android:text="@string/rotation_180" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/rotation270"
-                        style="@style/ChoiceButton"
-                        android:text="@string/rotation_270" />
 
                 </com.google.android.material.button.MaterialButtonToggleGroup>
 
