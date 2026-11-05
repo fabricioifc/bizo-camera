@@ -19,15 +19,9 @@
   <main>
     <section id="auth-view" class="panel" hidden>
       <h2>Entrar</h2>
-      <form id="auth-form">
-        <input id="email" type="email" autocomplete="username" placeholder="E-mail" required>
-        <input id="password" type="password" autocomplete="current-password" placeholder="Senha (mínimo 8 caracteres)" minlength="8" required>
-        <div class="actions">
-          <button type="submit" id="login-button">Entrar</button>
-          <button type="button" id="signup-button" class="secondary" hidden>Criar conta</button>
-        </div>
-      </form>
-      <a id="google-button" class="button google" href="/api/auth/google/start" hidden>Entrar com Google</a>
+      <p class="hint">Entre com sua conta Google. Depois, confirme o código de verificação em duas etapas.</p>
+      <a id="google-button" class="button google" href="/api/auth/google/start">Entrar com Google</a>
+      <a id="app-link" class="button" href="#" hidden>Abrir o app</a>
       <p id="auth-message" class="hint"></p>
     </section>
 
@@ -46,6 +40,7 @@
 
     <section id="security-view" class="panel" hidden>
       <h2>Segurança da conta</h2>
+      <p id="pending-note" class="hint" hidden>Para usar o monitor, ative a verificação em duas etapas agora.</p>
       <p id="security-status" class="hint"></p>
 
       <div id="setup-section" hidden>
@@ -72,7 +67,6 @@
 
       <div id="disable-section" hidden>
         <form id="disable-form">
-          <input id="disable-password" type="password" autocomplete="current-password" placeholder="Senha da conta">
           <input id="disable-code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Código do app ou de recuperação" required>
           <div class="actions">
             <button type="submit" class="danger">Desativar verificação em duas etapas</button>

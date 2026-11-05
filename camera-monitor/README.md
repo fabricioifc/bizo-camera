@@ -12,7 +12,7 @@ Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadro
 
 ## Uso
 
-1. Abra o app, entre com e-mail e senha da conta. Se a conta tiver verificação em duas etapas, digite o código do app autenticador quando ele pedir.
+1. Toque em **Entrar com Google**. O navegador abre a página de login; conclua o login e a verificação em duas etapas. O app volta sozinho.
 2. Toque em **Iniciar câmera**, concedendo as permissões.
 2. Abra o endereço do servidor no navegador do outro celular ou computador e entre com a mesma conta para assistir.
 

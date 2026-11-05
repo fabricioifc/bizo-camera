@@ -39,27 +39,13 @@ class RelayClient(context: Context) {
     val isSignedIn: Boolean get() = prefs.contains(KEY_SESSION)
     val isRegistered: Boolean get() = prefs.contains(KEY_ID) && prefs.contains(KEY_SECRET)
 
-    sealed class SignInResult {
-        object Done : SignInResult()
-        class NeedsCode(val mfaToken: String) : SignInResult()
-        object Failed : SignInResult()
-    }
+    /** Página de login com o Google. Abre no navegador; o retorno volta ao app pelo link monitor://. */
+    val loginUrl: String get() = "$baseUrl/api/auth/google/start?app=1"
 
-    /** Entra com a conta. Se a conta tiver verificação em duas etapas, pede o código depois. */
-    fun signIn(email: String, password: String): SignInResult {
-        val body = JSONObject().put("email", email).put("password", password).toString()
-        val response = post("/api/auth/login", body, session = null) ?: return SignInResult.Failed
-        if (response.optBoolean("mfaRequired")) {
-            return SignInResult.NeedsCode(response.getString("mfaToken"))
-        }
-        saveSession(response)
-        return SignInResult.Done
-    }
-
-    /** Segundo passo do login: o código do app autenticador ou um código de recuperação. */
-    fun signInWithCode(mfaToken: String, code: String): Boolean {
-        val body = JSONObject().put("mfaToken", mfaToken).put("code", code).toString()
-        val response = post("/api/auth/mfa", body, session = null) ?: return false
+    /** Troca o código de uso único (recebido pelo link monitor://) por uma sessão deste aparelho. */
+    fun exchangeCode(code: String): Boolean {
+        val body = JSONObject().put("code", code).toString()
+        val response = post("/api/auth/app-token", body, session = null) ?: return false
         saveSession(response)
         return true
     }

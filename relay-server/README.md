@@ -73,25 +73,27 @@ A conta Google só é vinculada a uma conta existente com o mesmo e-mail quando 
 
 ## Verificação em duas etapas (2FA)
 
+Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda não tiver 2FA, a sessão fica limitada à tela de **Segurança** até você ativá-lo. Nesse caso, as câmeras só aparecem depois.
+
 - Em **Segurança**, na tela da lista de câmeras, ative o 2FA. O servidor mostra um QR code para o app autenticador (Google Authenticator, Authy, 1Password…).
 - Ao confirmar o código, aparecem 8 **códigos de recuperação**. Eles valem uma vez cada e não são mostrados de novo.
 - Com o 2FA ativo, o login pede o código depois da senha. Depois de 5 códigos errados, é preciso entrar com a senha de novo.
-- Para desativar, informe a senha e um código (do app ou de recuperação).
+- Para desativar, informe um código (do app ou de recuperação).
 
 ## Proteção contra tentativas
 
-- Depois de 5 senhas erradas, a conta fica bloqueada por 15 minutos.
+- Depois de 5 códigos 2FA errados, a conta fica bloqueada por 15 minutos.
 - Login, cadastro e códigos 2FA têm limite de tentativas por IP, por minuto.
 - Cada código TOTP vale uma vez e códigos de recuperação são apagados depois de usados.
 
 ## Endpoints
 
 - `GET /api/config`: diz se o cadastro está aberto (`signupOpen`) e se o Google está ativo (`googleEnabled`).
-- `POST /api/auth/signup`: cria conta com `email` e `password` (mínimo de 8 caracteres).
-- `POST /api/auth/login`: entra com `email` e `password`. Se houver 2FA, responde `{ mfaRequired: true, mfaToken }`.
-- `POST /api/auth/mfa`: segunda etapa do login, com `mfaToken` e `code` (app ou recuperação).
+- `POST /api/auth/mfa`: segunda etapa do login pelo Google, com `mfaToken` e `code` (app ou recuperação).
+- `POST /api/auth/app-code`: a web, já logada, pede um código de uso único (60 segundos) para entregar a sessão ao app.
+- `POST /api/auth/app-token`: o app troca o código por um token de sessão próprio.
 - `POST /api/auth/logout`: encerra a sessão.
-- `GET /api/auth/me`: dados da conta logada (`email`, `hasPassword`, `google`, `twoFactor`).
+- `GET /api/auth/me`: dados da conta logada (`email`, `google`, `twoFactor`, `pending`).
 - `GET /api/auth/google/start` e `GET /api/auth/google/callback`: fluxo do login com Google.
 - `POST /api/account/2fa/setup`: gera o segredo do 2FA e o QR code.
 - `POST /api/account/2fa/enable`: confirma o código e devolve os códigos de recuperação.

@@ -19,18 +19,19 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_ENABLED = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
 // Cookie "Secure" só quando o site é HTTPS; em teste local (http) o navegador ignoraria o cookie.
 const SECURE_COOKIES = PUBLIC_URL.startsWith('https://');
+const APP_SCHEME = 'monitor://auth';
 const ISSUER = 'Monitor de Câmera';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MFA_TTL_MS = 5 * 60 * 1000;
 const OAUTH_TTL_MS = 10 * 60 * 1000;
+const APP_CODE_TTL_MS = 60 * 1000;
 const MAX_MFA_ATTEMPTS = 5;
-const MAX_PASSWORD_FAILURES = 5;
+const MAX_CODE_FAILURES = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 const RECOVERY_CODE_COUNT = 8;
 const MAX_BUFFERED_BYTES = 2 * 1024 * 1024;
 const OPEN = 1;
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const WEB_DIR = path.join(__dirname, '..', 'web');
 
 const STATIC_FILES = new Map([
@@ -44,7 +45,8 @@ const deviceSockets = new Map(); // deviceId -> WebSocket da câmera
 const viewerSockets = new Map(); // deviceId -> Set<WebSocket> dos visualizadores
 const rateBuckets = new Map(); // chave -> { count, resetAt }
 const pendingMfa = new Map(); // sha256(mfaToken) -> { email, expiresAt, attempts }
-const pendingOauth = new Map(); // state -> { verifier, nonce, expiresAt }
+const pendingOauth = new Map(); // state -> { verifier, nonce, app, expiresAt }
+const appCodes = new Map(); // sha256(code) -> { userId, expiresAt }; troca única por token do app
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const randomHex = (bytes) => crypto.randomBytes(bytes).toString('hex');
@@ -55,23 +57,12 @@ function safeEqual(a, b) {
   return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
 }
 
-function hashPassword(password) {
-  const salt = randomHex(16);
-  return `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`;
-}
-
-function verifyPassword(password, stored) {
-  if (!stored) return false;
-  const [salt, hash] = stored.split(':');
-  return safeEqual(crypto.scryptSync(password, salt, 64).toString('hex'), hash);
-}
-
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
 function signupOpen() {
-  // O primeiro usuário sempre pode se cadastrar; os demais precisam de ALLOW_SIGNUP=1.
+  // O primeiro usuário sempre pode entrar pela primeira vez; os demais precisam de ALLOW_SIGNUP=1.
   return ALLOW_SIGNUP || Object.keys(store.data.users).length === 0;
 }
 
@@ -161,11 +152,17 @@ function clearedSessionCookie() {
   return parts.join('; ');
 }
 
-function createSession(userId) {
+// pending: login pelo Google sem 2FA ativo. Essa sessão só serve para configurar o 2FA.
+function createSession(userId, pending = false) {
   const token = randomHex(32);
-  store.data.sessions[sha256(token)] = { userId, expiresAt: Date.now() + SESSION_TTL_MS };
+  store.data.sessions[sha256(token)] = { userId, expiresAt: Date.now() + SESSION_TTL_MS, pending };
   store.save();
   return token;
+}
+
+function sessionPending(token) {
+  const session = token ? store.data.sessions[sha256(token)] : undefined;
+  return Boolean(session && session.pending);
 }
 
 // Retorna o id do usuário dono do token, ou null se o token não existe ou expirou.
@@ -198,10 +195,10 @@ function deviceView(id) {
   return { id, name: device.name, online: deviceSockets.has(id) };
 }
 
-// Contagem de senhas erradas: bloqueia a conta por um tempo depois de várias tentativas.
-function recordPasswordFailure(user) {
+// Contagem de códigos 2FA errados: bloqueia a conta por um tempo depois de várias tentativas.
+function recordCodeFailure(user) {
   user.failures = (user.failures || 0) + 1;
-  if (user.failures >= MAX_PASSWORD_FAILURES) {
+  if (user.failures >= MAX_CODE_FAILURES) {
     user.lockedUntil = Date.now() + LOCKOUT_MS;
     user.failures = 0;
   }
@@ -258,10 +255,11 @@ function createMfaChallenge(email) {
   return token;
 }
 
-// Login concluído: emite o token (JSON para o app) e o cookie (para a web).
-function issueSession(res, user, email, status = 200) {
-  const token = createSession(user.id);
-  sendJson(res, status, { token, email }, { 'Set-Cookie': sessionCookie(token) });
+// Código de uso único, trocado pelo app por um token de sessão próprio.
+function createAppCode(userId) {
+  const code = randomHex(24);
+  appCodes.set(sha256(code), { userId, expiresAt: Date.now() + APP_CODE_TTL_MS });
+  return code;
 }
 
 async function handleApi(req, res, url) {
@@ -270,46 +268,6 @@ async function handleApi(req, res, url) {
 
   if (route === 'GET /api/config') {
     return sendJson(res, 200, { signupOpen: signupOpen(), googleEnabled: GOOGLE_ENABLED });
-  }
-
-  if (route === 'POST /api/auth/signup') {
-    if (rateLimited(req, 'signup', 10)) return sendJson(res, 429, { error: 'too_many_requests' });
-    if (!signupOpen()) return sendJson(res, 403, { error: 'signup_disabled' });
-    const body = await readJson(req);
-    const email = normalizeEmail(body.email);
-    if (!EMAIL_RE.test(email)) return sendJson(res, 400, { error: 'invalid_email' });
-    if (typeof body.password !== 'string' || body.password.length < 8) {
-      return sendJson(res, 400, { error: 'weak_password' });
-    }
-    if (store.data.users[email]) return sendJson(res, 409, { error: 'email_taken' });
-
-    const user = {
-      id: randomHex(8),
-      passwordHash: hashPassword(body.password),
-      createdAt: Date.now(),
-      failures: 0,
-      lockedUntil: 0,
-    };
-    store.data.users[email] = user;
-    store.save();
-    return issueSession(res, user, email, 201);
-  }
-
-  if (route === 'POST /api/auth/login') {
-    if (rateLimited(req, 'login', 10)) return sendJson(res, 429, { error: 'too_many_requests' });
-    const body = await readJson(req);
-    const email = normalizeEmail(body.email);
-    const user = EMAIL_RE.test(email) ? store.data.users[email] : undefined;
-    if (user && isLocked(user)) return sendJson(res, 429, { error: 'account_locked' });
-    if (!user || typeof body.password !== 'string' || !verifyPassword(body.password, user.passwordHash)) {
-      if (user) recordPasswordFailure(user);
-      return sendJson(res, 401, { error: 'invalid_credentials' });
-    }
-    resetFailures(user);
-    if (twoFactorEnabled(user)) {
-      return sendJson(res, 200, { mfaRequired: true, mfaToken: createMfaChallenge(email) });
-    }
-    return issueSession(res, user, email);
   }
 
   // Segunda etapa do login: o código do app autenticador ou um código de recuperação.
@@ -333,11 +291,34 @@ async function handleApi(req, res, url) {
       return sendJson(res, 401, { error: 'mfa_expired' });
     }
     if (!checkSecondFactor(entry, body.code)) {
+      recordCodeFailure(entry);
       return sendJson(res, 401, { error: 'invalid_code' });
     }
     pendingMfa.delete(key);
     resetFailures(entry);
-    return issueSession(res, entry, challenge.email);
+    const session = createSession(entry.id);
+    return sendJson(res, 200, { token: session, email: challenge.email }, { 'Set-Cookie': sessionCookie(session) });
+  }
+
+  // A página web, já logada, pede um código para entregar a sessão ao app Android.
+  if (route === 'POST /api/auth/app-code') {
+    const userId = sessionUserId(token);
+    if (!userId) return sendJson(res, 401, { error: 'unauthorized' });
+    if (sessionPending(token)) return sendJson(res, 403, { error: 'two_factor_required' });
+    return sendJson(res, 200, { code: createAppCode(userId) });
+  }
+
+  // O app troca o código de uso único por um token de sessão próprio.
+  if (route === 'POST /api/auth/app-token') {
+    if (rateLimited(req, 'app-token', 20)) return sendJson(res, 429, { error: 'too_many_requests' });
+    const body = await readJson(req);
+    const key = typeof body.code === 'string' ? sha256(body.code) : '';
+    const grant = appCodes.get(key);
+    appCodes.delete(key);
+    if (!grant || grant.expiresAt < Date.now()) return sendJson(res, 401, { error: 'code_expired' });
+    const entry = userById(grant.userId);
+    if (!entry) return sendJson(res, 401, { error: 'unauthorized' });
+    return sendJson(res, 200, { token: createSession(grant.userId), email: entry.email });
   }
 
   if (route === 'POST /api/auth/logout') {
@@ -354,9 +335,9 @@ async function handleApi(req, res, url) {
     if (!entry) return sendJson(res, 401, { error: 'unauthorized' });
     return sendJson(res, 200, {
       email: entry.email,
-      hasPassword: Boolean(entry.user.passwordHash),
       google: Boolean(entry.user.googleId),
       twoFactor: twoFactorEnabled(entry.user),
+      pending: sessionPending(token),
     });
   }
 
@@ -383,19 +364,18 @@ async function handleApi(req, res, url) {
     factor.enabled = true;
     factor.lastStep = step;
     factor.recovery = codes.map((code) => sha256(code.replace(/-/g, '')));
+    // Com o 2FA ativo, a sessão pendente vira uma sessão completa.
+    const session = store.data.sessions[sha256(token)];
+    if (session) session.pending = false;
     store.save();
     return sendJson(res, 200, { recoveryCodes: codes });
   }
 
-  // Desligar o 2FA exige a senha (se a conta tiver uma) e um código válido.
   if (route === 'POST /api/account/2fa/disable') {
     const entry = userById(sessionUserId(token) || '');
     if (!entry) return sendJson(res, 401, { error: 'unauthorized' });
     if (!twoFactorEnabled(entry.user)) return sendJson(res, 400, { error: 'not_enabled' });
     const body = await readJson(req);
-    if (entry.user.passwordHash && !verifyPassword(String(body.password || ''), entry.user.passwordHash)) {
-      return sendJson(res, 401, { error: 'invalid_credentials' });
-    }
     if (!checkSecondFactor(entry.user, body.code)) return sendJson(res, 401, { error: 'invalid_code' });
     delete entry.user.totp;
     store.save();
@@ -405,6 +385,7 @@ async function handleApi(req, res, url) {
   if (route === 'GET /api/devices') {
     const userId = sessionUserId(token);
     if (!userId) return sendJson(res, 401, { error: 'unauthorized' });
+    if (sessionPending(token)) return sendJson(res, 403, { error: 'two_factor_required' });
     const devices = Object.entries(store.data.devices)
       .filter(([, device]) => device.ownerId === userId)
       .map(([id]) => deviceView(id));
@@ -415,6 +396,7 @@ async function handleApi(req, res, url) {
   if (route === 'POST /api/devices/register') {
     const userId = sessionUserId(token);
     if (!userId) return sendJson(res, 401, { error: 'unauthorized' });
+    if (sessionPending(token)) return sendJson(res, 403, { error: 'two_factor_required' });
     const body = await readJson(req);
     const id = randomHex(8);
     const secret = randomHex(32);
@@ -432,6 +414,7 @@ async function handleApi(req, res, url) {
 }
 
 // Login com Google: inicia o fluxo e recebe o retorno do Google.
+// Com app=1, o retorno vai para o app Android (web ou link monitor://).
 function handleGoogle(req, res, url) {
   if (!GOOGLE_ENABLED) return sendJson(res, 404, { error: 'not_found' });
   const redirectUri = `${PUBLIC_URL}/api/auth/google/callback`;
@@ -439,7 +422,12 @@ function handleGoogle(req, res, url) {
   if (url.pathname === '/api/auth/google/start') {
     if (rateLimited(req, 'google', 20)) return sendJson(res, 429, { error: 'too_many_requests' });
     const attempt = google.newAttempt();
-    pendingOauth.set(attempt.state, { verifier: attempt.verifier, nonce: attempt.nonce, expiresAt: Date.now() + OAUTH_TTL_MS });
+    pendingOauth.set(attempt.state, {
+      verifier: attempt.verifier,
+      nonce: attempt.nonce,
+      app: url.searchParams.get('app') === '1',
+      expiresAt: Date.now() + OAUTH_TTL_MS,
+    });
     return redirect(res, google.authorizationUrl({ clientId: GOOGLE_CLIENT_ID, redirectUri, attempt }));
   }
 
@@ -449,12 +437,18 @@ function handleGoogle(req, res, url) {
   pendingOauth.delete(state);
   const code = url.searchParams.get('code');
   if (!attempt || attempt.expiresAt < Date.now() || !code || url.searchParams.get('error')) {
-    return redirect(res, '/#error=google');
+    return redirect(res, failureTarget(attempt, 'error=google'));
   }
 
   return finishGoogleLogin(res, { code, attempt, redirectUri }).catch(() => {
-    if (!res.headersSent) redirect(res, '/#error=google');
+    if (!res.headersSent) redirect(res, failureTarget(attempt, 'error=google'));
   });
+}
+
+// Destino de erro: o app recebe pelo link monitor://, a web pelo fragmento.
+function failureTarget(attempt, reason) {
+  if (attempt && attempt.app) return `${APP_SCHEME}?error=${reason.replace('error=', '')}`;
+  return `/#${reason}`;
 }
 
 async function finishGoogleLogin(res, { code, attempt, redirectUri }) {
@@ -475,21 +469,23 @@ async function finishGoogleLogin(res, { code, attempt, redirectUri }) {
     entry = [email, store.data.users[email]];
   }
   if (!entry) {
-    if (!signupOpen()) return redirect(res, '/#error=signup_disabled');
-    const user = { id: randomHex(8), passwordHash: null, googleId: claims.sub, createdAt: Date.now(), failures: 0, lockedUntil: 0 };
+    if (!signupOpen()) return redirect(res, failureTarget(attempt, 'error=signup_disabled'));
+    const user = { id: randomHex(8), googleId: claims.sub, createdAt: Date.now(), failures: 0, lockedUntil: 0 };
     store.data.users[email] = user;
     entry = [email, user];
   }
   store.save();
 
   const [accountEmail, user] = entry;
+  const base = attempt.app ? '/?app=1' : '/';
   if (twoFactorEnabled(user)) {
-    // O 2FA próprio da conta continua valendo depois do Google. O código vai no fragmento da URL,
+    // O 2FA da conta continua valendo depois do Google. O código vai no fragmento da URL,
     // que o navegador não envia ao servidor.
-    return redirect(res, `/#mfa=${createMfaChallenge(accountEmail)}`);
+    return redirect(res, `${base}#mfa=${createMfaChallenge(accountEmail)}`);
   }
-  const token = createSession(user.id);
-  return redirect(res, '/', { 'Set-Cookie': sessionCookie(token) });
+  // Login pelo Google exige 2FA. Sem 2FA ativo, a sessão fica pendente até a configuração.
+  const token = createSession(user.id, !twoFactorEnabled(user));
+  return redirect(res, base, { 'Set-Cookie': sessionCookie(token) });
 }
 
 function serveStatic(pathname, res) {
@@ -614,9 +610,12 @@ server.on('upgrade', (req, socket, head) => {
   if (url.pathname === '/ws/view') {
     const deviceId = url.searchParams.get('device');
     // A página web envia o cookie; o token na URL continua aceito por compatibilidade.
-    const userId = sessionUserId(url.searchParams.get('token') || cookieToken(req));
+    const sessionToken = url.searchParams.get('token') || cookieToken(req);
+    const userId = sessionUserId(sessionToken);
     const device = deviceId ? store.data.devices[deviceId] : undefined;
-    if (!userId || !device || device.ownerId !== userId) return reject(socket, '403 Forbidden');
+    if (!userId || sessionPending(sessionToken) || !device || device.ownerId !== userId) {
+      return reject(socket, '403 Forbidden');
+    }
     return wss.handleUpgrade(req, socket, head, (ws) => attachViewer(deviceId, ws));
   }
 
@@ -648,6 +647,7 @@ setInterval(() => {
   if (changed) store.save();
   for (const [key, challenge] of pendingMfa) if (challenge.expiresAt < now) pendingMfa.delete(key);
   for (const [key, attempt] of pendingOauth) if (attempt.expiresAt < now) pendingOauth.delete(key);
+  for (const [key, grant] of appCodes) if (grant.expiresAt < now) appCodes.delete(key);
   for (const [key, bucket] of rateBuckets) if (bucket.resetAt < now) rateBuckets.delete(key);
 }, 10 * 60 * 1000);
 

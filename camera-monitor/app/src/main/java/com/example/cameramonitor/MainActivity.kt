@@ -3,6 +3,7 @@ package com.example.cameramonitor
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -17,9 +18,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val relay by lazy { RelayClient(this) }
     private val io = Executors.newSingleThreadExecutor()
-
-    // Token da etapa 2FA, enquanto o app espera o código do usuário.
-    private var pendingMfaToken: String? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -43,11 +41,19 @@ class MainActivity : AppCompatActivity() {
                 else -> requestPermissionsAndStart()
             }
         }
-        binding.loginButton.setOnClickListener { signIn() }
+        binding.loginButton.setOnClickListener { openLogin() }
         binding.signOutButton.setOnClickListener {
             relay.signOut()
             refresh()
         }
+        handleAuthIntent(intent)
+    }
+
+    // O login volta ao app por monitor://auth; o app já pode estar aberto.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAuthIntent(intent)
     }
 
     override fun onResume() {
@@ -61,74 +67,39 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    private fun signIn() {
-        val pending = pendingMfaToken
-        if (pending != null) {
-            submitCode(pending)
-            return
-        }
-        val email = binding.emailInput.text.toString().trim()
-        val password = binding.passwordInput.text.toString()
-        if (email.isEmpty() || password.isEmpty()) {
-            binding.loginMessage.text = getString(R.string.login_fill)
+    private fun openLogin() {
+        binding.loginMessage.text = getString(R.string.login_waiting)
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(relay.loginUrl)))
+    }
+
+    private fun handleAuthIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != AUTH_SCHEME || data.host != AUTH_HOST) return
+        intent.data = null // evita tratar o mesmo código duas vezes ao girar a tela
+
+        val code = data.getQueryParameter("code")
+        if (code.isNullOrEmpty()) {
+            binding.loginMessage.text = getString(R.string.login_error)
             return
         }
         binding.loginButton.isEnabled = false
         binding.loginMessage.text = getString(R.string.login_loading)
         io.execute {
-            when (val result = relay.signIn(email, password)) {
-                is RelayClient.SignInResult.NeedsCode -> runOnUiThread { askForCode(result.mfaToken) }
-                RelayClient.SignInResult.Failed -> runOnUiThread { finishLogin(loggedIn = false, registered = false) }
-                RelayClient.SignInResult.Done -> {
-                    val registered = relay.registerDevice()
-                    runOnUiThread { finishLogin(loggedIn = true, registered = registered) }
-                }
-            }
-        }
-    }
-
-    private fun askForCode(mfaToken: String) {
-        pendingMfaToken = mfaToken
-        binding.codeInput.visibility = View.VISIBLE
-        binding.codeInput.text?.clear()
-        binding.loginButton.isEnabled = true
-        binding.loginMessage.text = getString(R.string.mfa_prompt)
-        binding.codeInput.requestFocus()
-    }
-
-    private fun submitCode(mfaToken: String) {
-        val code = binding.codeInput.text.toString().trim()
-        if (code.isEmpty()) {
-            binding.loginMessage.text = getString(R.string.mfa_fill)
-            return
-        }
-        binding.loginButton.isEnabled = false
-        binding.loginMessage.text = getString(R.string.login_loading)
-        io.execute {
-            val loggedIn = relay.signInWithCode(mfaToken, code)
+            val loggedIn = relay.exchangeCode(code)
             val registered = loggedIn && relay.registerDevice()
             runOnUiThread {
-                if (loggedIn) {
-                    pendingMfaToken = null
-                    binding.codeInput.visibility = View.GONE
-                    binding.codeInput.text?.clear()
-                    finishLogin(loggedIn = true, registered = registered)
-                } else {
-                    binding.loginButton.isEnabled = true
-                    binding.loginMessage.text = getString(R.string.mfa_failed)
-                }
+                binding.loginButton.isEnabled = true
+                finishLogin(loggedIn, registered)
             }
         }
     }
 
     private fun finishLogin(loggedIn: Boolean, registered: Boolean) {
-        binding.loginButton.isEnabled = true
         binding.loginMessage.text = when {
             !loggedIn -> getString(R.string.login_error)
             !registered -> getString(R.string.register_error)
             else -> ""
         }
-        if (loggedIn) binding.passwordInput.text?.clear()
         refresh()
     }
 
@@ -185,4 +156,9 @@ class MainActivity : AppCompatActivity() {
     private fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
+
+    companion object {
+        private const val AUTH_SCHEME = "monitor"
+        private const val AUTH_HOST = "auth"
+    }
 }
