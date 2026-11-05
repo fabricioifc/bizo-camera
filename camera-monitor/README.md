@@ -9,8 +9,8 @@ Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadro
    - Linha de comando: `./gradlew assembleRelease -PrelayUrl=https://outro.dominio`
    - Ou, para valer em todos os builds, adicione `relayUrl=https://outro.dominio` em `~/.gradle/gradle.properties` (no Windows, `C:\Users\<usuário>\.gradle\gradle.properties`).
 3. O Client ID do Google (cliente **Aplicativo da Web**, o mesmo `GOOGLE_CLIENT_ID` do servidor) já está em `gradle.properties` como `googleServerClientId`. Para outro valor, use `-PgoogleServerClientId=...` na linha de comando.
-4. No Google Cloud, crie também um cliente OAuth do tipo **Android** com o nome do pacote `br.dev.bizo.cameramonitor` e o SHA-1 da keystore de release. Sem ele, o seletor de conta não abre.
-5. Conecte o celular com depuração USB e clique em Run.
+4. No Google Cloud, crie um cliente OAuth do tipo **Android** com o nome do pacote `br.dev.bizo.cameramonitor` e o SHA-1 da keystore de release. Sem ele, o seletor de conta não abre. Para usar o build debug em paralelo, crie outro cliente Android com o pacote `br.dev.bizo.cameramonitor.debug` e o SHA-1 da chave de debug do Android.
+5. Conecte o celular com depuração USB e clique em Run. O build debug tem o sufixo `.debug` no identificador do app e pode ficar instalado ao lado do release. Como são instalações separadas, configure novamente o endereço local do relay no app debug.
 
 ## Testes
 
@@ -37,6 +37,7 @@ A versão aparece no fim da tela **Configurações** (por exemplo, "Versão 0.3.
 - O código passa pelo R8 (APK menor). As regras extras ficam em `app/proguard-rules.pro`.
 - Os erros de login mostram só a mensagem, sem o motivo técnico (código HTTP, exceção).
 - O endereço do servidor precisa ser `https://`.
+- No build debug, para testar um servidor HTTP na rede local, informe o IP e a porta do computador (por exemplo, `192.168.1.11:8787`); o app usa `http://` automaticamente. O aparelho e o computador precisam estar na mesma rede.
 
 ## Organização do código
 

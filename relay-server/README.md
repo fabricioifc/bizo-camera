@@ -29,7 +29,15 @@ O `PUBLIC_URL` do `.env` é usado para construir o callback OAuth. Para desenvol
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-Esse arquivo Compose é independente e usa `http://localhost:8787` como endereço de callback e um volume de dados separado (`relay-data-dev`). No Google Cloud Console, adicione `http://localhost:8787/api/auth/google/callback` às URIs de redirecionamento autorizadas do cliente OAuth usado localmente. O navegador também deve abrir o endereço exatamente como `http://localhost:8787` (não `127.0.0.1`). Para voltar à configuração normal, execute `docker compose up -d --build relay`.
+Esse arquivo Compose é independente, desativa a exigência de 2FA, publica a porta `8787` nas interfaces de rede do computador e usa um volume separado (`relay-data-dev`). No navegador do computador, use `http://localhost:8787` para entrar. No Google Cloud Console, adicione `http://localhost:8787/api/auth/google/callback` às URIs de redirecionamento autorizadas do cliente OAuth usado localmente.
+
+Para conectar o celular na mesma rede Wi-Fi:
+
+1. Descubra o endereço IPv4 local do computador que está rodando Docker (por exemplo, `192.168.1.20`).
+2. No app Android **debug**, abra **Servidor** na tela de login ou em **Configurações > Servidor** e informe `http://192.168.1.20:8787`, substituindo pelo IP encontrado.
+3. Se o Android não conseguir conectar, permita conexões de entrada na porta `8787` para a rede local no firewall do computador.
+
+O build release do app exige HTTPS; use o build debug para testar por HTTP na rede local. Para voltar à configuração normal, execute `docker compose up -d --build relay`; o Compose de produção continua publicado somente em `127.0.0.1`.
 
 Comandos úteis:
 
@@ -117,6 +125,7 @@ Abra http://localhost:8787 no navegador.
 | `DATA_FILE` | `data/db.json` | Arquivo onde ficam usuários, câmeras e sessões. No Docker, é `/data/db.json`. |
 | `ALLOW_SIGNUP` | (vazio) | Defina `1` para permitir novos cadastros além do primeiro usuário. |
 | `TRUST_PROXY` | (vazio) | Defina `1` atrás de um proxy ou túnel (cloudflared, Caddy, Nginx), para limitar tentativas por IP real. |
+| `REQUIRE_2FA` | `1` | Exige verificação em duas etapas no login e antes do acesso às câmeras. No Compose de desenvolvimento fica desativado. |
 | `GOOGLE_CLIENT_ID` | (vazio) | Cliente OAuth do Google. Sem ele, o botão de login com Google fica desativado. |
 | `GOOGLE_CLIENT_SECRET` | (vazio) | Segredo do cliente OAuth. Nunca versione este valor. |
 | `BACKUP_SCHEDULE` | `0 6 * * *` | Horário diário do backup em UTC, no formato cron. |

@@ -54,6 +54,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             // R8 encolhe o código e remove recursos sem uso: APK menor e mais rápido.
             isMinifyEnabled = true

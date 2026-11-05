@@ -61,7 +61,7 @@
     <string name="server_dialog_title">Endereço do servidor</string>
     <string name="server_hint">Endereço, como camera.exemplo.com</string>
     <string name="server_helper">Use o mesmo endereço do site. Padrão: %1$s</string>
-    <string name="server_invalid">Digite um endereço https válido, como camera.exemplo.com.</string>
+    <string name="server_invalid">Digite um endereço válido, como camera.exemplo.com.</string>
     <string name="server_unreachable">Esse endereço não respondeu como um servidor do Monitor de Câmera. Confira e tente de novo.</string>
     <string name="server_default">Usar padrão</string>
     <string name="server_saved">Servidor alterado.</string>

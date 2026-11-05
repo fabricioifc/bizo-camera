@@ -61,6 +61,7 @@ async function startServer({ seed, env = {} } = {}) {
       GOOGLE_CLIENT_ID: '',
       GOOGLE_CLIENT_SECRET: '',
       ALLOW_SIGNUP: '',
+      REQUIRE_2FA: '1',
       ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],

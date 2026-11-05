@@ -22,6 +22,7 @@ class ServerSettingsTest {
     fun `http só em build de teste`() {
         assertNull(ServerSettings.normalize("http://192.168.1.11:8787"))
         assertEquals("http://192.168.1.11:8787", ServerSettings.normalize("http://192.168.1.11:8787", allowHttp = true))
+        assertEquals("http://192.168.1.11:8787", ServerSettings.normalize("192.168.1.11:8787", allowHttp = true))
     }
 
     @Test

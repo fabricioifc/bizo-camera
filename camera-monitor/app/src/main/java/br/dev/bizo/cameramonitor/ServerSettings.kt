@@ -24,13 +24,13 @@ object ServerSettings {
     }
 
     /**
-     * Normaliza o que o usuário digitou para `https://host[:porta]`, ou devolve null se não for válido.
-     * Aceita sem o `https://` e com barra no fim. `http://` só com [allowHttp] (builds de teste).
+     * Normaliza o endereço para `https://host[:porta]`, ou devolve null se não for válido.
+     * Em builds que permitem HTTP, endereços sem esquema usam `http://` para facilitar testes na rede local.
      */
     fun normalize(input: String, allowHttp: Boolean = false): String? {
         var text = input.trim()
         if (text.isEmpty()) return null
-        if (!text.contains("://")) text = "https://$text"
+        if (!text.contains("://")) text = if (allowHttp) "http://$text" else "https://$text"
         text = text.trimEnd('/')
         val uri = runCatching { URI(text) }.getOrNull() ?: return null
         val scheme = uri.scheme?.lowercase()

@@ -9,6 +9,7 @@ services:
       # Os valores são lidos do .env pelo Docker Compose.
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8787}
       TRUST_PROXY: ${TRUST_PROXY:-1}
+      REQUIRE_2FA: ${REQUIRE_2FA:-1}
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-0}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}

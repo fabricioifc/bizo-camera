@@ -123,3 +123,24 @@ describe('sessão pendente de 2FA', () => {
     assert.ok(!saved.includes(enable.data.recoveryCodes[0]));
   });
 });
+
+describe('2FA opcional em desenvolvimento', () => {
+  let server;
+  let account;
+
+  before(async () => {
+    account = seedAccount({ pending: true });
+    server = await startServer({ seed: account.db, env: { REQUIRE_2FA: '0' } });
+  });
+  after(() => server.stop());
+
+  it('libera sessões pendentes sem exigir configuração de 2FA', async () => {
+    const me = await server.call('GET', '/api/auth/me', { token: account.session });
+    assert.equal(me.status, 200);
+    assert.equal(me.data.pending, false);
+    assert.equal((await server.call('GET', '/api/devices', { token: account.session })).status, 200);
+
+    const viewer = await server.open(`/ws/view?device=${account.deviceId}&token=${account.session}`);
+    viewer.close();
+  });
+});
