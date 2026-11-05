@@ -23,6 +23,9 @@ function createHub() {
   const viewers = new Map(); // deviceId -> Set<WebSocket> dos visualizadores
   const health = new Map(); // deviceId -> { battery, charging, temperature, throttled, updatedAt }
   const settings = new Map(); // deviceId -> { lens, quality, rotation, motion, sensitivity, torch, torchAvailable }
+  const subscribers = []; // { onStatus(deviceId, online), onHealth(deviceId, health) }
+
+  const emitStatus = (deviceId, online) => subscribers.forEach((s) => s.onStatus?.(deviceId, online));
 
   function notifyViewers(deviceId, payload) {
     for (const viewer of viewers.get(deviceId) || []) sendJsonWs(viewer, payload);
@@ -46,6 +49,12 @@ function createHub() {
     setHealth(deviceId, value) {
       health.set(deviceId, value);
       notifyViewers(deviceId, { type: 'health', health: value });
+      subscribers.forEach((s) => s.onHealth?.(deviceId, value));
+    },
+
+    /** Avisos de conexão e saúde das câmeras (usado pelo vigia de alertas). */
+    subscribe(subscriber) {
+      subscribers.push(subscriber);
     },
 
     /** Configurações atuais informadas pela câmera; os visualizadores recebem na hora. */
@@ -77,9 +86,11 @@ function createHub() {
         health.delete(deviceId);
         settings.delete(deviceId);
         notifyViewers(deviceId, { type: 'status', online: false });
+        emitStatus(deviceId, false);
       });
 
       notifyViewers(deviceId, { type: 'status', online: true });
+      emitStatus(deviceId, true);
       if (viewers.get(deviceId)?.size) sendJsonWs(ws, { type: 'start' });
     },
 

@@ -20,6 +20,18 @@ function isValidSubscription(subscription) {
 function createAlerts({ store, push }) {
   const subscriptionsOf = (userId) => store.data.push[userId] || [];
 
+  // Envia a todos os navegadores do usuário e remove as assinaturas que o navegador cancelou.
+  async function send(userId, payload) {
+    const subscriptions = subscriptionsOf(userId);
+    if (subscriptions.length === 0) return;
+    const delivered = await Promise.all(subscriptions.map((subscription) => push.send(subscription, payload)));
+    const alive = subscriptions.filter((_, index) => delivered[index]);
+    if (alive.length !== subscriptions.length) {
+      store.data.push[userId] = alive;
+      store.save();
+    }
+  }
+
   return {
     publicKey: push.publicKey,
 
@@ -38,17 +50,16 @@ function createAlerts({ store, push }) {
       store.save();
     },
 
-    /** Avisa o dono da câmera e remove as assinaturas que o navegador cancelou. */
-    async notifyMotion(deviceId, device, event) {
-      const subscriptions = subscriptionsOf(device.ownerId);
-      if (subscriptions.length === 0) return;
-      const payload = { title: 'Movimento detectado', device: device.name, deviceId, at: event.at, eventId: event.id };
-      const delivered = await Promise.all(subscriptions.map((subscription) => push.send(subscription, payload)));
-      const alive = subscriptions.filter((_, index) => delivered[index]);
-      if (alive.length !== subscriptions.length) {
-        store.data.push[device.ownerId] = alive;
-        store.save();
-      }
+    /** Avisa o dono da câmera de um movimento. */
+    notifyMotion(deviceId, device, event) {
+      return send(device.ownerId, {
+        kind: 'motion', title: 'Movimento detectado', device: device.name, deviceId, at: event.at, eventId: event.id,
+      });
+    },
+
+    /** Avisa o dono sobre a câmera (offline, de volta, fora da tomada, bateria baixa, quente). */
+    notifyDevice(deviceId, device, { kind, title, body, at }) {
+      return send(device.ownerId, { kind, title, body, device: device.name, deviceId, at });
     },
   };
 }

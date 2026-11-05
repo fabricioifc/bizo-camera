@@ -86,6 +86,8 @@ function createDevices({ store, hub, alerts, snapshotDir }) {
       online,
       health: online ? hub.health(id) : null,
       lastMotionAt: lastEvent ? lastEvent.at : null,
+      // Última conexão ou desconexão: com a câmera offline, mostra desde quando.
+      lastSeenAt: device.lastSeenAt || null,
     };
   }
 

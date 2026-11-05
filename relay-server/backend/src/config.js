@@ -25,6 +25,8 @@ function loadConfig(env = process.env) {
       clientSecret: googleClientSecret,
       enabled: Boolean(googleClientId && googleClientSecret),
     },
+    // Câmera sem conexão por este tempo gera o alerta "Câmera offline".
+    offlineAlertMs: Number(env.OFFLINE_ALERT_MS) || 5 * 60 * 1000,
     // Pacote do app aceito nas atualizações (o build debug usa o sufixo .debug).
     appPackage: env.APP_PACKAGE || 'br.dev.bizo.cameramonitor',
     dataFile,

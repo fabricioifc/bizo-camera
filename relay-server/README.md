@@ -191,6 +191,7 @@ Abra http://localhost:8787 no navegador.
 | `REQUIRE_2FA` | `1` | Exige verificação em duas etapas no login e antes do acesso às câmeras. No Compose de desenvolvimento fica desativado. |
 | `GOOGLE_CLIENT_ID` | (vazio) | Cliente OAuth do Google. Sem ele, o botão de login com Google fica desativado. |
 | `GOOGLE_CLIENT_SECRET` | (vazio) | Segredo do cliente OAuth. Nunca versione este valor. |
+| `OFFLINE_ALERT_MS` | `300000` | Tempo sem conexão até o alerta "Câmera offline" (em milissegundos). |
 | `APP_PACKAGE` | `br.dev.bizo.cameramonitor` | Pacote do app aceito na atualização pelo próprio app. |
 | `WEB_DIR` | `relay-server/frontend/dist` | Pasta da página compilada servida pelo backend. |
 | `BACKUP_SCHEDULE` | `0 6 * * *` | Horário diário do backup em UTC, no formato cron. |
@@ -239,6 +240,17 @@ A tela de uma câmera tem duas abas: **Ao vivo** (imagem e controles) e **Movime
 - detecção de movimento e sensibilidade.
 
 O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valores conhecidos, com no máximo 20 pedidos a cada 10 segundos por visualizador. A câmera aplica, salva no aparelho e responde com o estado atual, que aparece em todos os visualizadores abertos. Precisa da versão do app com controle remoto; com a versão anterior, o cartão fica esperando a câmera.
+
+## Alertas da câmera
+
+Além do movimento, o servidor avisa pela mesma notificação do navegador (ative em **Configurações > Alertas**, em cada aparelho):
+
+- **Câmera offline:** sem conexão por 5 minutos (`OFFLINE_ALERT_MS`); quedas rápidas de Wi-Fi não contam. Quando ela volta, chega "Câmera de volta".
+- **Fora da tomada:** o celular parou de carregar.
+- **Bateria baixa:** 20% ou menos, sem carregar. Avisa de novo só depois de recarregar.
+- **Esquentando:** o app reduziu a qualidade por causa do calor.
+
+O mesmo aviso (tomada, bateria, calor) não se repete em menos de 10 minutos. Ao subir, o servidor dá 5 minutos para as câmeras vistas nas últimas 24 horas reconectarem; se não voltarem, avisa. A lista de câmeras mostra desde quando cada câmera está offline.
 
 ## Alertas de movimento
 

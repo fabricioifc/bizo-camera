@@ -60,8 +60,8 @@ onMounted(async () => {
   <section class="card" aria-labelledby="alerts-title">
     <div class="card-header">
       <div>
-        <h2 id="alerts-title">Alertas de movimento</h2>
-        <p class="small muted">Notificação neste aparelho quando uma câmera detectar movimento.</p>
+        <h2 id="alerts-title">Alertas</h2>
+        <p class="small muted">Notificação neste aparelho quando uma câmera detectar movimento, ficar offline, sair da tomada, ficar com a bateria baixa ou esquentar.</p>
       </div>
     </div>
     <div class="setting">

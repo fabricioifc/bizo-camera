@@ -1,6 +1,7 @@
 'use strict';
 
-// Service worker: recebe os alertas de movimento e mostra a notificação, mesmo com o site fechado.
+// Service worker: recebe os alertas (movimento, câmera offline, tomada, bateria, calor) e mostra a
+// notificação, mesmo com o site fechado.
 
 self.addEventListener('push', (event) => {
   let data = {};
@@ -12,13 +13,19 @@ self.addEventListener('push', (event) => {
   const time = data.at
     ? new Date(data.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     : '';
-  const body = [data.device, time].filter(Boolean).join(' às ');
+  // Alertas da câmera trazem o texto pronto; o de movimento mostra a câmera e o horário.
+  const body = data.body
+    ? [data.body, time].filter(Boolean).join(' · ')
+    : [data.device, time].filter(Boolean).join(' às ');
+  const kind = data.kind || 'motion';
+  // Offline e "de volta" dividem a mesma notificação: a mais nova substitui a anterior.
+  const group = kind === 'online' ? 'offline' : kind;
   event.waitUntil(
     self.registration.showNotification(data.title || 'Movimento detectado', {
       body,
       icon: '/icon-192.png',
-      // Uma notificação por câmera: um novo alerta substitui o anterior.
-      tag: data.deviceId ? `motion-${data.deviceId}` : 'motion',
+      // Uma notificação por câmera e tipo de alerta: um novo alerta substitui o anterior.
+      tag: data.deviceId ? `${group}-${data.deviceId}` : group,
       renotify: true,
       data: { deviceId: data.deviceId },
     }),

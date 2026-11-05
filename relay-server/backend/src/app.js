@@ -14,6 +14,7 @@ const { createHub } = require('./services/hub');
 const { createAlerts } = require('./services/alerts');
 const { createDevices } = require('./services/devices');
 const { createReleases } = require('./services/releases');
+const { createWatchdog } = require('./services/watchdog');
 const { authRoutes } = require('./routes/auth');
 const { accountRoutes } = require('./routes/account');
 const { deviceRoutes } = require('./routes/devices');
@@ -42,6 +43,10 @@ function createApp(config) {
     rateLimit: createRateLimiter({ trustProxy: config.trustProxy }),
     releases: createReleases({ dataDir: config.dataDir, appPackage: config.appPackage }),
   };
+
+  // Alertas de câmera offline, fora da tomada, bateria baixa e calor.
+  const watchdog = createWatchdog({ store, hub, alerts, offlineAfterMs: config.offlineAlertMs });
+  watchdog.start();
 
   const router = createRouter();
   const auth = authRoutes(router, app);

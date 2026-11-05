@@ -86,6 +86,10 @@ function remove() {
         <AppIcon name="motion" :size="16" />
         {{ device.lastMotionAt ? `Último movimento ${formatWhen(device.lastMotionAt)}` : 'Nenhum movimento registrado' }}
       </span>
+      <span v-if="!device.online && device.lastSeenAt" class="device-meta muted">
+        <AppIcon name="alert" :size="16" />
+        Offline desde {{ formatWhen(device.lastSeenAt) }}
+      </span>
       <p v-if="error" class="small text-danger" role="alert">{{ error }}</p>
     </div>
 
