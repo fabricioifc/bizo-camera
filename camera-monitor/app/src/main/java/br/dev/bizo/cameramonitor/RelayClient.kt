@@ -38,6 +38,7 @@ class RelayClient(context: Context) {
 
     val isSignedIn: Boolean get() = prefs.contains(KEY_SESSION)
     val isRegistered: Boolean get() = prefs.contains(KEY_ID) && prefs.contains(KEY_SECRET)
+    val email: String? get() = prefs.getString(KEY_EMAIL, null)
 
     sealed class LoginResult {
         object Done : LoginResult()
@@ -45,6 +46,10 @@ class RelayClient(context: Context) {
         object NeedsSetup : LoginResult()
         object Failed : LoginResult()
     }
+
+    // Motivo da última chamada de rede que falhou, para mostrar ao usuário.
+    @Volatile var lastError: String? = null
+        private set
 
     // Sessão da conta sem 2FA ativo: só serve para configurar o 2FA. Fica só na memória.
     private var setupToken: String? = null
@@ -142,11 +147,19 @@ class RelayClient(context: Context) {
             .url("$baseUrl$path")
             .post(json.toRequestBody(JSON_TYPE))
         if (session != null) builder.header("Authorization", "Bearer $session")
+        lastError = null
         return try {
             http.newCall(builder.build()).execute().use { response ->
-                if (!response.isSuccessful) null else JSONObject(response.body!!.string())
+                val body = response.body!!.string()
+                if (!response.isSuccessful) {
+                    lastError = "HTTP ${response.code} $path: $body"
+                    null
+                } else {
+                    JSONObject(body)
+                }
             }
         } catch (e: Exception) {
+            lastError = "${e.javaClass.simpleName} em $path: ${e.message}"
             null
         }
     }

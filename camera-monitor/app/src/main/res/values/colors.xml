@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cores do indicador de status da câmera. -->
+    <color name="status_off">#9E9E9E</color>
+    <color name="status_connecting">#F59E0B</color>
+    <color name="status_ready">#22C55E</color>
+    <color name="status_live">#EF4444</color>
+</resources>

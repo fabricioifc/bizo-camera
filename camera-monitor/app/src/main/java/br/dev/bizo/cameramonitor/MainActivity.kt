@@ -3,11 +3,13 @@ package br.dev.bizo.cameramonitor
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -18,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import br.dev.bizo.cameramonitor.databinding.ActivityMainBinding
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.material.color.MaterialColors
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
@@ -33,13 +36,17 @@ class MainActivity : AppCompatActivity() {
     private var step = Step.SIGN_IN
     private var mfaToken: String? = null
 
+    // Aviso temporário no cartão de status (ex.: permissão negada); some no próximo refresh de estado.
+    private var statusNotice: String? = null
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         if (hasCameraPermission()) {
             startStreaming()
         } else {
-            binding.infoText.text = getString(R.string.need_camera)
+            statusNotice = getString(R.string.need_camera)
+            refresh()
         }
     }
 
@@ -49,15 +56,21 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.toggleButton.setOnClickListener {
-            when {
-                StreamService.isRunning -> stopStreaming()
-                !relay.isSignedIn -> binding.loginMessage.text = getString(R.string.need_login)
-                else -> requestPermissionsAndStart()
-            }
+            statusNotice = null
+            if (StreamService.isRunning) stopStreaming() else requestPermissionsAndStart()
         }
         binding.loginButton.setOnClickListener { onLoginButtonClicked() }
+        binding.codeInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                onLoginButtonClicked()
+                true
+            } else {
+                false
+            }
+        }
         binding.signOutButton.setOnClickListener {
             relay.signOut()
+            showStep(Step.SIGN_IN)
             refresh()
         }
         showStep(Step.SIGN_IN)
@@ -86,11 +99,10 @@ class MainActivity : AppCompatActivity() {
     private fun signInWithGoogle() {
         val serverClientId = BuildConfig.GOOGLE_SERVER_CLIENT_ID
         if (serverClientId.isBlank()) {
-            binding.loginMessage.text = getString(R.string.login_config_missing)
+            showLoginError(getString(R.string.login_config_missing))
             return
         }
         setBusy(true)
-        binding.loginMessage.text = getString(R.string.login_loading)
         lifecycleScope.launch {
             // Cancelar o seletor de conta, ou falha do Google, caem no mesmo erro.
             var failure: String? = null
@@ -103,7 +115,7 @@ class MainActivity : AppCompatActivity() {
             if (idToken == null) {
                 setBusy(false)
                 // Mostra o motivo técnico para diagnosticar (ex.: SHA-1 ou pacote não cadastrados no Google Cloud).
-                binding.loginMessage.text = getString(R.string.login_error) + (failure?.let { "\n($it)" } ?: "")
+                showLoginError(getString(R.string.login_error), failure)
                 return@launch
             }
             io.execute {
@@ -134,20 +146,15 @@ class MainActivity : AppCompatActivity() {
             is RelayClient.LoginResult.NeedsCode -> {
                 mfaToken = result.mfaToken
                 showStep(Step.CODE)
-                binding.loginMessage.text = getString(R.string.mfa_prompt)
             }
             RelayClient.LoginResult.NeedsSetup -> startSetup()
-            RelayClient.LoginResult.Failed -> binding.loginMessage.text = getString(R.string.login_error)
+            RelayClient.LoginResult.Failed -> showLoginError(getString(R.string.login_error), relay.lastError)
         }
     }
 
     private fun submitCode() {
         val token = mfaToken ?: return
-        val code = binding.codeInput.text.toString().trim()
-        if (code.isEmpty()) {
-            binding.loginMessage.text = getString(R.string.mfa_fill)
-            return
-        }
+        val code = enteredCode() ?: return
         setBusy(true)
         io.execute {
             val verified = relay.verifyCode(token, code)
@@ -157,7 +164,7 @@ class MainActivity : AppCompatActivity() {
                     mfaToken = null
                     finishLogin()
                 } else {
-                    binding.loginMessage.text = getString(R.string.mfa_failed)
+                    showLoginError(getString(R.string.mfa_failed))
                 }
             }
         }
@@ -171,33 +178,27 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 setBusy(false)
                 if (setup == null) {
-                    binding.loginMessage.text = getString(R.string.setup_failed)
+                    showLoginError(getString(R.string.setup_failed), relay.lastError)
                     return@runOnUiThread
                 }
                 showQrCode(setup.first)
-                showStep(Step.SETUP)
-                binding.loginMessage.text = getString(R.string.setup_prompt, setup.second)
+                showStep(Step.SETUP, getString(R.string.setup_prompt, setup.second))
             }
         }
     }
 
     private fun confirmSetup() {
-        val code = binding.codeInput.text.toString().trim()
-        if (code.isEmpty()) {
-            binding.loginMessage.text = getString(R.string.mfa_fill)
-            return
-        }
+        val code = enteredCode() ?: return
         setBusy(true)
         io.execute {
             val codes = relay.confirmTwoFactor(code)
             runOnUiThread {
                 setBusy(false)
                 if (codes == null) {
-                    binding.loginMessage.text = getString(R.string.mfa_failed)
+                    showLoginError(getString(R.string.mfa_failed))
                 } else {
                     // A sessão já está completa; os códigos são mostrados uma vez.
-                    showStep(Step.RECOVERY)
-                    binding.loginMessage.text = getString(R.string.recovery_prompt, codes.joinToString("\n"))
+                    showStep(Step.RECOVERY, getString(R.string.recovery_prompt, codes.joinToString("\n")))
                 }
             }
         }
@@ -210,10 +211,19 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 setBusy(false)
                 showStep(Step.SIGN_IN)
-                binding.loginMessage.text = if (registered) "" else getString(R.string.register_error)
+                statusNotice = if (registered) null else getString(R.string.register_error)
                 refresh()
             }
         }
+    }
+
+    private fun enteredCode(): String? {
+        val code = binding.codeInput.text?.toString()?.trim().orEmpty()
+        if (code.isEmpty()) {
+            showLoginError(getString(R.string.mfa_fill))
+            return null
+        }
+        return code
     }
 
     private fun showQrCode(dataUrl: String) {
@@ -221,24 +231,34 @@ class MainActivity : AppCompatActivity() {
         binding.qrImage.setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
     }
 
-    // Uma etapa por vez: mostra só o campo e o botão que ela precisa.
-    private fun showStep(newStep: Step) {
+    // Uma etapa por vez: título, instrução, campo e botão daquela etapa.
+    private fun showStep(newStep: Step, message: String? = null) {
         step = newStep
+        val (title, button, hint) = when (newStep) {
+            Step.SIGN_IN -> Triple(R.string.login_title, R.string.login_button, R.string.login_hint)
+            Step.CODE -> Triple(R.string.mfa_title, R.string.mfa_button, R.string.mfa_prompt)
+            Step.SETUP -> Triple(R.string.setup_title, R.string.setup_button, R.string.setup_prompt)
+            Step.RECOVERY -> Triple(R.string.recovery_title, R.string.recovery_done_button, R.string.recovery_prompt)
+        }
+        binding.loginTitle.setText(title)
+        binding.loginButton.setText(button)
+        binding.loginMessage.text = message ?: getString(hint)
         binding.codeInput.text?.clear()
-        binding.codeInput.visibility = if (newStep == Step.CODE || newStep == Step.SETUP) View.VISIBLE else View.GONE
-        binding.qrImage.visibility = if (newStep == Step.SETUP) View.VISIBLE else View.GONE
-        binding.loginButton.setText(
-            when (newStep) {
-                Step.SIGN_IN -> R.string.login_button
-                Step.CODE -> R.string.mfa_button
-                Step.SETUP -> R.string.setup_button
-                Step.RECOVERY -> R.string.recovery_done_button
-            }
-        )
+        binding.codeLayout.visibility = visibleIf(newStep == Step.CODE || newStep == Step.SETUP)
+        binding.qrImage.visibility = visibleIf(newStep == Step.SETUP)
+        showLoginError(null)
+        if (newStep == Step.CODE || newStep == Step.SETUP) binding.codeInput.requestFocus()
+    }
+
+    private fun showLoginError(text: String?, detail: String? = null) {
+        binding.loginError.text = if (text == null) "" else text + (detail?.let { "\n($it)" } ?: "")
+        binding.loginError.visibility = visibleIf(text != null)
     }
 
     private fun setBusy(busy: Boolean) {
         binding.loginButton.isEnabled = !busy
+        binding.loginProgress.visibility = visibleIf(busy)
+        if (busy) showLoginError(null)
     }
 
     private fun requestPermissionsAndStart() {
@@ -257,14 +277,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun startStreaming() {
         // Registra o aparelho antes de subir o serviço, para ele já conectar.
+        binding.toggleButton.isEnabled = false
         io.execute {
             val registered = relay.registerDevice()
             runOnUiThread {
+                binding.toggleButton.isEnabled = true
                 if (registered) {
                     ContextCompat.startForegroundService(this, Intent(this, StreamService::class.java))
-                    binding.infoText.postDelayed({ refresh() }, 800)
+                    binding.root.postDelayed({ refresh() }, 800)
                 } else {
-                    binding.infoText.text = getString(R.string.register_error)
+                    statusNotice = getString(R.string.register_error)
+                    refresh()
                 }
             }
         }
@@ -272,24 +295,43 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopStreaming() {
         startService(Intent(this, StreamService::class.java).setAction(StreamService.ACTION_STOP))
-        binding.infoText.postDelayed({ refresh() }, 500)
+        binding.root.postDelayed({ refresh() }, 500)
     }
 
     private fun refresh() {
         val running = StreamService.isRunning
         val signedIn = relay.isSignedIn
 
-        binding.toggleButton.setText(if (running) R.string.toggle_stop else R.string.toggle_start)
-        binding.loginPanel.visibility = if (signedIn) View.GONE else View.VISIBLE
-        binding.signOutButton.visibility = if (signedIn && !running) View.VISIBLE else View.GONE
-        binding.infoText.text = when {
-            running && !RelayClient.connected -> getString(R.string.status_connecting)
-            running && RelayClient.streaming -> getString(R.string.status_live)
-            running -> getString(R.string.status_connected)
-            !signedIn -> getString(R.string.need_login)
-            else -> getString(R.string.stopped)
+        // Status: cor, título e explicação de acordo com o estado da câmera.
+        val (color, title, detail) = when {
+            !signedIn -> Triple(R.color.status_off, R.string.status_signed_out_title, R.string.status_signed_out_detail)
+            running && !RelayClient.connected ->
+                Triple(R.color.status_connecting, R.string.status_connecting_title, R.string.status_connecting_detail)
+            running && RelayClient.streaming ->
+                Triple(R.color.status_live, R.string.status_live_title, R.string.status_live_detail)
+            running -> Triple(R.color.status_ready, R.string.status_ready_title, R.string.status_ready_detail)
+            else -> Triple(R.color.status_off, R.string.status_stopped_title, R.string.status_stopped_detail)
         }
+        binding.statusDot.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, color))
+        binding.statusTitle.setText(title)
+        binding.statusDetail.text = statusNotice ?: getString(detail)
+
+        binding.accountText.text = relay.email?.let { getString(R.string.account_label, it) }
+        binding.accountText.visibility = visibleIf(signedIn && relay.email != null)
+
+        // Botão principal: azul para iniciar, vermelho para parar.
+        binding.toggleButton.visibility = visibleIf(signedIn)
+        binding.toggleButton.setText(if (running) R.string.toggle_stop else R.string.toggle_start)
+        val background = if (running) com.google.android.material.R.attr.colorError else androidx.appcompat.R.attr.colorPrimary
+        val foreground = if (running) com.google.android.material.R.attr.colorOnError else com.google.android.material.R.attr.colorOnPrimary
+        binding.toggleButton.backgroundTintList = ColorStateList.valueOf(MaterialColors.getColor(binding.toggleButton, background))
+        binding.toggleButton.setTextColor(MaterialColors.getColor(binding.toggleButton, foreground))
+
+        binding.loginPanel.visibility = visibleIf(!signedIn)
+        binding.signOutButton.visibility = visibleIf(signedIn && !running)
     }
+
+    private fun visibleIf(condition: Boolean) = if (condition) View.VISIBLE else View.GONE
 
     private fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==

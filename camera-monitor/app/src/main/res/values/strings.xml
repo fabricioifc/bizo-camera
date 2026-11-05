@@ -1,32 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Monitor de Câmera</string>
+
+    <!-- Câmera -->
     <string name="toggle_start">Iniciar câmera</string>
     <string name="toggle_stop">Parar câmera</string>
-    <string name="stopped">Câmera parada.</string>
-    <string name="need_camera">A permissão de câmera é necessária.</string>
-    <string name="need_login">Entre com sua conta Google para usar esta câmera.</string>
+    <string name="need_camera">Permita o uso da câmera para transmitir.</string>
+    <string name="register_error">Não foi possível registrar esta câmera. Verifique a conexão.</string>
+
+    <!-- Status -->
+    <string name="status_signed_out_title">Sem conta</string>
+    <string name="status_signed_out_detail">Entre com sua conta Google para usar este celular como câmera.</string>
+    <string name="status_stopped_title">Câmera parada</string>
+    <string name="status_stopped_detail">Toque em Iniciar câmera. A imagem só é enviada quando alguém estiver assistindo.</string>
+    <string name="status_connecting_title">Conectando…</string>
+    <string name="status_connecting_detail">Aguardando conexão com o servidor.</string>
+    <string name="status_ready_title">Pronta</string>
+    <string name="status_ready_detail">Conectada. Aguardando alguém abrir a câmera.</string>
+    <string name="status_live_title">Ao vivo</string>
+    <string name="status_live_detail">Transmitindo para quem está assistindo.</string>
+    <string name="account_label">Conta: %1$s</string>
+
+    <!-- Login -->
+    <string name="login_title">Entrar</string>
+    <string name="login_hint">Use a mesma conta Google do site para ver esta câmera de qualquer lugar.</string>
     <string name="login_button">Entrar com Google</string>
     <string name="login_config_missing">Falta o Client ID do Google no build (googleServerClientId).</string>
-    <string name="login_loading">Entrando…</string>
     <string name="login_error">Não foi possível entrar com o Google. Tente de novo.</string>
-    <string name="mfa_prompt">Digite o código de 6 números do seu app autenticador (ou um código de recuperação).</string>
+    <string name="mfa_title">Verificação em duas etapas</string>
+    <string name="mfa_prompt">Digite o código de 6 números do seu app autenticador, ou um código de recuperação.</string>
     <string name="mfa_code_hint">Código de verificação</string>
     <string name="mfa_button">Confirmar código</string>
     <string name="mfa_fill">Digite o código.</string>
     <string name="mfa_failed">Código incorreto. Tente de novo.</string>
-    <string name="setup_button">Ativar verificação em duas etapas</string>
+    <string name="setup_title">Ative a verificação em duas etapas</string>
+    <string name="setup_button">Ativar</string>
     <string name="setup_qr_description">QR code para o app autenticador</string>
-    <string name="setup_prompt">Esta conta precisa de verificação em duas etapas. Escaneie o QR code com o app autenticador ou digite a chave %1$s. Depois, digite o código de 6 números que ele mostrar.</string>
+    <string name="setup_prompt">Escaneie o QR code com o app autenticador (Google Authenticator, Authy…) ou digite a chave %1$s. Depois, digite o código que ele mostrar.</string>
     <string name="setup_failed">Não foi possível iniciar a configuração. Verifique a conexão.</string>
+    <string name="recovery_title">Guarde os códigos de recuperação</string>
     <string name="recovery_done_button">Já guardei os códigos</string>
-    <string name="recovery_prompt">Guarde estes códigos de recuperação. Cada um vale uma vez:\n\n%1$s</string>
-    <string name="login_waiting">Conclua o login no navegador. Depois, o app volta sozinho.</string>
-    <string name="register_error">Não foi possível registrar esta câmera. Verifique a conexão.</string>
-    <string name="status_connecting">Conectando ao servidor…</string>
-    <string name="status_connected">Conectada. Aguardando um visualizador.</string>
-    <string name="status_live">Transmitindo ao vivo.</string>
+    <string name="recovery_prompt">Use um destes códigos se perder o app autenticador. Cada um vale uma vez e eles não serão mostrados de novo.\n\n%1$s</string>
     <string name="sign_out">Sair da conta neste aparelho</string>
+
+    <!-- Notificação -->
     <string name="notif_channel">Transmissão da câmera</string>
     <string name="notif_title">Câmera ativa</string>
     <string name="notif_text">Conectada ao servidor</string>
