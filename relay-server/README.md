@@ -223,9 +223,9 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 
 ## Controle remoto
 
-Na tela de uma câmera ao vivo, o cartão **Controles da câmera** muda, sem tocar no celular:
+A tela de uma câmera tem duas abas: **Ao vivo** (imagem e controles) e **Movimentos** (fotos dos últimos movimentos, com um contador dos que chegaram enquanto a aba estava fechada). Na aba Ao vivo, o cartão **Controles** muda, sem tocar no celular:
 
-- câmera (traseira ou frontal), rotação (0°, 90°, 180° ou 270°, para o celular preso de lado) e qualidade;
+- câmera (traseira ou frontal), rotação (−90°, 0°, 90° ou 180°, para o celular preso de lado ou de cabeça para baixo) e qualidade;
 - lanterna (só em lentes com flash; a frontal normalmente não tem);
 - detecção de movimento e sensibilidade.
 

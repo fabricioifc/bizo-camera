@@ -182,7 +182,7 @@ onBeforeUnmount(() => {
   </div>
 
   <!-- A conexão continua aberta nas duas abas: a imagem volta na hora ao trocar. -->
-  <div v-show="tab === 'live'" class="live">
+  <div v-show="tab === 'live'" class="live-view">
     <div class="stage">
       <img v-if="frameUrl" :src="frameUrl" alt="Transmissão ao vivo">
       <div v-else class="stage-status">

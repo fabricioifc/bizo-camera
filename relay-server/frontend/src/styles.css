@@ -933,7 +933,7 @@ code,
 }
 
 /* Aba Ao vivo: imagem à esquerda, controles à direita (embaixo em telas menores). */
-.live {
+.live-view {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   align-items: start;
@@ -1234,7 +1234,7 @@ code,
    ========================================================================= */
 
 @media (max-width: 1100px) {
-  .live {
+  .live-view {
     grid-template-columns: minmax(0, 1fr);
   }
 
