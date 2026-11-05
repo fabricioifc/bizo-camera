@@ -16,7 +16,8 @@ services:
     volumes:
       - relay-data:/data
 
-  # Backup do volume de dados: uma cópia ao subir e outra por dia, em ./backups (fora do git).
+  # Backup do volume de dados: uma cópia ao subir e outra por dia, em BACKUP_DIR (padrão ./backups,
+  # fora do git). No Dokploy, que clona o código de novo a cada deploy, use uma pasta fixa do servidor.
   backup:
     image: alpine:3.20
     restart: unless-stopped
@@ -28,7 +29,7 @@ services:
       BACKUP_KEEP: ${BACKUP_KEEP:-14}
     volumes:
       - relay-data:/data:ro
-      - ./backups:/backups
+      - ${BACKUP_DIR:-./backups}:/backups
       - ./scripts:/scripts:ro
 
   # Restauração (só roda quando chamada): docker compose run --rm restore /backups/<arquivo>
@@ -38,8 +39,11 @@ services:
     entrypoint: ["/bin/sh", "/scripts/restore.sh"]
     volumes:
       - relay-data:/data
-      - ./backups:/backups:ro
+      - ${BACKUP_DIR:-./backups}:/backups:ro
       - ./scripts:/scripts:ro
 
 volumes:
   relay-data:
+    # Nome fixo: o mesmo volume vale rodando daqui (projeto relay-server) ou pelo Dokploy,
+    # que usa outro nome de projeto. Sem isso, o Dokploy criaria um volume vazio.
+    name: relay-server_relay-data

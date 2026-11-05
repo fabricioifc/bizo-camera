@@ -90,7 +90,7 @@ Abra `http://localhost:5173`. O Vite encaminha a API, o retorno do login com Goo
 
 O volume tem tudo o que não dá para recriar: contas, sessões, câmeras, fotos de movimento e as chaves dos alertas (`vapid.json`). O serviço `backup` do `docker-compose.yml` cuida disso sozinho: sobe junto com o servidor (`docker compose up -d`), faz uma cópia ao iniciar e outra todo dia às 03:00 de Brasília.
 
-- As cópias ficam em `relay-server/backups/relay-data-<data>.tar.gz` (fora do git; a data no nome é em UTC).
+- As cópias ficam em `relay-server/backups/relay-data-<data>.tar.gz` (fora do git; a data no nome é em UTC), ou na pasta definida em `BACKUP_DIR`.
 - Guarda as 14 mais recentes. Horário e quantidade ficam em `BACKUP_SCHEDULE` (formato do cron, em UTC) e `BACKUP_KEEP`, no `docker-compose.yml`.
 - O volume é montado só para leitura no serviço de backup, então ele nunca altera os dados.
 - Leve as cópias para fora do computador de vez em quando (pendrive ou nuvem privada).
@@ -197,6 +197,7 @@ Abra http://localhost:8787 no navegador.
 | `WEB_DIR` | `relay-server/frontend/dist` | Pasta da página compilada servida pelo backend. |
 | `BACKUP_SCHEDULE` | `0 6 * * *` | Horário diário do backup em UTC, no formato cron. |
 | `BACKUP_KEEP` | `14` | Quantidade de backups a manter. |
+| `BACKUP_DIR` | `./backups` | Pasta do servidor onde ficam os backups. No Dokploy, use uma pasta fixa (ex.: `/home/fabricio/backups/relay-server`), porque o código é clonado de novo a cada deploy. |
 
 No Docker, configure essas variáveis em `relay-server/.env`, criado a partir de `.env.example`. Esse arquivo é carregado pelo Docker Compose e está no `.gitignore`. Para publicar sua própria instância, defina `PUBLIC_URL` com o endereço HTTPS público e configure o túnel ou proxy para encaminhar o tráfego ao relay.
 
