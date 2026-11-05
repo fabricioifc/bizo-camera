@@ -178,10 +178,19 @@ describe('arquivos da página', () => {
   });
   after(() => server.stop());
 
-  it('página aponta app.js e styles.css com versão', async () => {
+  it('serve o bundle compilado do Vue com assets versionados', async () => {
     const html = (await server.call('GET', '/')).data.toString();
-    assert.match(html, /src="\/app\.js\?v=[a-f0-9]{10}"/);
-    assert.match(html, /href="\/styles\.css\?v=[a-f0-9]{10}"/);
+    const script = html.match(/src="(\/assets\/index-[a-zA-Z0-9_-]+\.js)"/);
+    const stylesheet = html.match(/href="(\/assets\/index-[a-zA-Z0-9_-]+\.css)"/);
+    assert.ok(script);
+    assert.ok(stylesheet);
+    const js = await server.call('GET', script[1]);
+    const css = await server.call('GET', stylesheet[1]);
+    assert.equal(js.status, 200);
+    assert.equal(css.status, 200);
+    assert.match(js.headers.get('content-type'), /javascript/);
+    assert.match(css.headers.get('content-type'), /text\/css/);
+    assert.match(js.headers.get('cache-control'), /immutable/);
   });
 
   it('serve service worker, favicon e ícones', async () => {

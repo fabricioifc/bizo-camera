@@ -39,9 +39,7 @@ const OPEN = 1;
 const WEB_DIR = path.join(__dirname, '..', 'web');
 
 const STATIC_FILES = new Map([
-  ['/', { file: 'index.html', type: 'text/html; charset=utf-8' }],
-  ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
-  ['/styles.css', { file: 'styles.css', type: 'text/css; charset=utf-8' }],
+  ['/', { file: path.join('dist', 'index.html'), type: 'text/html; charset=utf-8' }],
   ['/sw.js', { file: 'sw.js', type: 'text/javascript; charset=utf-8' }],
   ['/favicon.ico', { file: 'favicon.ico', type: 'image/x-icon' }],
   ['/icon-192.png', { file: 'icon-192.png', type: 'image/png' }],
@@ -719,25 +717,14 @@ async function finishGoogleLogin(res, { code, attempt, redirectUri }) {
   return redirect(res, '/', { 'Set-Cookie': sessionCookie(token) });
 }
 
-// Versão de cada arquivo da página (hash do conteúdo). Muda a cada deploy, então o navegador
-// baixa o app.js e o styles.css novos em vez de reaproveitar os antigos do cache.
-const assetVersions = new Map();
-
-function assetVersion(file) {
-  if (!assetVersions.has(file)) {
-    assetVersions.set(file, sha256(fs.readFileSync(path.join(WEB_DIR, file))).slice(0, 10));
-  }
-  return assetVersions.get(file);
-}
-
-function withAssetVersions(html) {
-  return html
-    .replace('src="/app.js"', `src="/app.js?v=${assetVersion('app.js')}"`)
-    .replace('href="/styles.css"', `href="/styles.css?v=${assetVersion('styles.css')}"`);
-}
-
 function serveStatic(pathname, res) {
-  const entry = STATIC_FILES.get(pathname);
+  const assetMatch = pathname.match(/^\/assets\/([a-zA-Z0-9._-]+)$/);
+  const entry = STATIC_FILES.get(pathname) || (assetMatch
+    ? {
+        file: path.join('dist', 'assets', assetMatch[1]),
+        type: assetMatch[1].endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8',
+      }
+    : null);
   if (!entry) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     return res.end('Não encontrado');
@@ -747,16 +734,15 @@ function serveStatic(pathname, res) {
       res.writeHead(500);
       return res.end();
     }
-    const data = entry.file === 'index.html' ? withAssetVersions(content.toString('utf8')) : content;
     res.writeHead(200, {
       'Content-Type': entry.type,
-      'Cache-Control': 'no-cache',
+      'Cache-Control': assetMatch ? 'public, max-age=31536000, immutable' : 'no-cache',
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'no-referrer',
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'",
     });
-    res.end(data);
+    res.end(content);
   });
 }
 

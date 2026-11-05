@@ -5,8 +5,10 @@
   "description": "Servidor que liga a câmera (celular) aos visualizadores pela internet",
   "main": "src/server.js",
   "scripts": {
+    "build:web": "vite build",
+    "dev:web": "vite",
     "start": "node src/server.js",
-    "test": "node --test"
+    "test": "npm run build:web && node --test"
   },
   "engines": {
     "node": ">=18"
@@ -15,5 +17,10 @@
     "qrcode": "^1.5.4",
     "web-push": "^3.6.7",
     "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^6.0.0",
+    "vue": "^3.5.13"
   }
 }

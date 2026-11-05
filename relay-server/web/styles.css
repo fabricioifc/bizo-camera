@@ -116,6 +116,10 @@ main {
   font-size: 0.9rem;
 }
 
+.hint.error {
+  color: var(--danger);
+}
+
 form {
   display: flex;
   gap: 8px;

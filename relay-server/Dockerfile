@@ -3,10 +3,14 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci
+
+COPY frontend ./frontend
+COPY vite.config.js ./
+COPY web ./web
+RUN npm run build:web && npm prune --omit=dev && npm cache clean --force
 
 COPY src ./src
-COPY web ./web
 
 # Os dados (usuários, câmeras e sessões) ficam num volume, fora da imagem.
 ENV NODE_ENV=production \

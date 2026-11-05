@@ -1,4 +1,5 @@
 node_modules/
+web/dist/
 # Banco local com contas e hashes: nunca versionar.
 data/
 # Cópias do volume de dados (contas, fotos, chaves): ficam só nesta máquina.

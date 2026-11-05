@@ -4,7 +4,7 @@ Liga a câmera (app Android) aos visualizadores (navegador). Também entrega o s
 
 ## Rodar com Docker
 
-Requer Docker Desktop (ou Docker Engine + Compose).
+Requer Docker Desktop (ou Docker Engine + Compose). A interface web usa Vue 3 e Vite; os arquivos compilados são servidos pelo relay.
 
 Configure as variáveis de ambiente antes de iniciar pela primeira vez:
 
@@ -23,13 +23,21 @@ O servidor fica em `http://localhost:8787`, publicado só em `127.0.0.1`. Os dad
 
 ### Desenvolvimento local com login Google
 
-O `PUBLIC_URL` do `.env` é usado para construir o callback OAuth. Para desenvolver em `http://localhost:8787` sem alterar o endereço de produção, use o arquivo Compose de desenvolvimento:
+O `PUBLIC_URL` do `.env` é usado para construir o callback OAuth. Para desenvolver sem alterar o endereço de produção, use o arquivo Compose de desenvolvimento:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-Esse arquivo Compose é independente, desativa a exigência de 2FA, publica a porta `8787` nas interfaces de rede do computador e usa um volume separado (`relay-data-dev`). No navegador do computador, use `http://localhost:8787` para entrar. No Google Cloud Console, adicione `http://localhost:8787/api/auth/google/callback` às URIs de redirecionamento autorizadas do cliente OAuth usado localmente.
+Esse arquivo Compose é independente, desativa a exigência de 2FA, publica a porta `8787` nas interfaces de rede do computador e usa um volume separado (`relay-data-dev`). Também inicia o frontend Vue/Vite em um container separado na porta `5173`. Ele usa `PUBLIC_URL=http://localhost:5173` para que o callback Google passe pelo Vite. Adicione `http://localhost:5173/api/auth/google/callback` às URIs de redirecionamento autorizadas do cliente OAuth local.
+
+Suba o relay e o frontend juntos:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+Abra `http://localhost:5173` para usar o frontend Vue. O relay e a conexão da câmera continuam na porta `8787`; use `http://IP_DO_COMPUTADOR:8787` no app Android debug. Alterações nos arquivos em `frontend/` são refletidas pelo Vite sem rebuild.
 
 Para conectar o celular na mesma rede Wi-Fi:
 
@@ -52,6 +60,18 @@ Para apagar os dados junto com o volume, use `docker compose down -v`. Isso remo
 ### Saúde do servidor
 
 `GET /healthz` responde `{ "ok": true }` enquanto o servidor atende. O Dockerfile usa essa rota no `HEALTHCHECK`, a cada 30 segundos, e `docker ps` mostra `healthy` ou `unhealthy`. O Docker sozinho só reinicia o container quando o processo cai (`restart: unless-stopped`); um container que ficar `unhealthy` sem cair precisa de `docker compose restart relay`.
+
+### Desenvolvimento da interface Vue
+
+Se preferir executar o Vite fora do Docker, com o relay em execução pela configuração dev, instale as dependências e inicie-o:
+
+```bash
+cd relay-server
+npm install
+npm run dev:web
+```
+
+Abra `http://localhost:5173` no navegador para usar o site e fazer login. O Vite encaminha API, callback OAuth e WebSockets para o relay em `8787`. Para conectar a câmera Android debug, use `http://IP_DO_COMPUTADOR:8787`. Para publicação, o Docker compila a interface com `npm run build:web` e serve os assets produzidos pelo Node.
 
 ### Backup
 
@@ -111,6 +131,7 @@ A primeira conta pode ser criada sem configuração extra. Depois que existir um
 ```bash
 cd relay-server
 npm install
+npm run build:web
 npm start
 ```
 
