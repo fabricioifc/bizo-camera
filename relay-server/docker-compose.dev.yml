@@ -21,6 +21,8 @@ services:
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-0}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      CLIP_STORAGE_MB: ${CLIP_STORAGE_MB:-}
+      OFFLINE_ALERT_MS: ${OFFLINE_ALERT_MS:-}
     volumes:
       # O código vem da pasta local; o nodemon reinicia o servidor a cada alteração.
       - ./backend/src:/app/src

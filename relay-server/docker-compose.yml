@@ -13,6 +13,10 @@ services:
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-0}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Vazias: valem os padrões do servidor (500 MB, 5 minutos, pacote de produção).
+      CLIP_STORAGE_MB: ${CLIP_STORAGE_MB:-}
+      OFFLINE_ALERT_MS: ${OFFLINE_ALERT_MS:-}
+      APP_PACKAGE: ${APP_PACKAGE:-}
     volumes:
       - relay-data:/data
 
