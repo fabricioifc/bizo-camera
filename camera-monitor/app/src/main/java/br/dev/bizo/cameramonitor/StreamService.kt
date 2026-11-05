@@ -6,13 +6,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
-import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.net.wifi.WifiManager
-import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -30,10 +26,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.LiveData
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.math.abs
 
 /**
  * Serviço em primeiro plano: mantém a câmera ativa e a conexão com o servidor
@@ -52,16 +46,13 @@ class StreamService : LifecycleService() {
 
     // Qualidade escolhida pelo usuário e o limite imposto pelo calor; vale o mais econômico dos dois.
     @Volatile private var quality = Quality.MEDIUM
-    @Volatile private var thermalIntervalMs = 0L
-    @Volatile private var thermalJpegQuality = 100
+    @Volatile private var thermalLimit = ThermalLimit.NONE
     private var cameraState: LiveData<CameraState>? = null
 
     // Detecção de movimento (roda na thread de análise dos quadros).
+    private val motionDetector = MotionDetector()
     @Volatile private var motionEnabled = true
     @Volatile private var sensitivity = Sensitivity.MEDIUM
-    @Volatile private var previousLuma: IntArray? = null
-    private var previousMeanLuma = 0
-    private var motionStreak = 0
     private var lastMotionCheckAt = 0L
     private var lastMotionSentAt = 0L
 
@@ -218,9 +209,9 @@ class StreamService : LifecycleService() {
             val available = runCatching { provider.hasCamera(lens) }.getOrDefault(false)
             val selector = if (available) lens else CameraSelector.DEFAULT_BACK_CAMERA
             val camera = provider.bindToLifecycle(this, selector, analysis)
-            // Erro grave (ex.: câmera bloqueada pelo sistema por ter sido aberta em segundo plano).
             // Câmera ou enquadramento novos: a próxima comparação de movimento recomeça do zero.
-            previousLuma = null
+            motionDetector.reset()
+            // Erro grave (ex.: câmera bloqueada pelo sistema por ter sido aberta em segundo plano).
             cameraState?.removeObservers(this)
             cameraState = camera.cameraInfo.cameraState
             camera.cameraInfo.cameraState.observe(this) { state ->
@@ -239,16 +230,17 @@ class StreamService : LifecycleService() {
             // Movimento: confere duas vezes por segundo, mesmo sem ninguém assistindo.
             if (motionEnabled && RelayClient.connected && now - lastMotionCheckAt >= MOTION_CHECK_MS) {
                 lastMotionCheckAt = now
-                if (detectMotion(image) && now - lastMotionSentAt >= MOTION_COOLDOWN_MS) {
+                val moved = motionDetector.update(image.lumaGrid(GRID_COLUMNS, GRID_ROWS), sensitivity.changedFraction)
+                if (moved && now - lastMotionSentAt >= MOTION_COOLDOWN_MS) {
                     lastMotionSentAt = now
                     sendMotion(image)
                 }
             }
             // Sem visualizador, não gasta CPU nem dados convertendo quadros.
-            val interval = maxOf(quality.frameIntervalMs, thermalIntervalMs)
+            val interval = maxOf(quality.frameIntervalMs, thermalLimit.minFrameIntervalMs)
             if (!RelayClient.streaming || now - lastFrameAt < interval) return
             lastFrameAt = now
-            relay.sendFrame(image.toJpeg())
+            relay.sendFrame(image.toJpeg(jpegQuality()))
         } catch (e: Exception) {
             Log.w(TAG, "Falha ao converter quadro", e)
         } finally {
@@ -256,104 +248,20 @@ class StreamService : LifecycleService() {
         }
     }
 
-    // Compara uma grade de pontos com a da conferência anterior. Desconta a variação geral
-    // de brilho (luz acesa, exposição automática) para não confundir com movimento.
-    private fun detectMotion(image: ImageProxy): Boolean {
-        val plane = image.planes[0]
-        val buffer = plane.buffer
-        val current = IntArray(GRID_WIDTH * GRID_HEIGHT)
-        var sum = 0
-        for (gy in 0 until GRID_HEIGHT) {
-            val y = (gy * 2 + 1) * image.height / (GRID_HEIGHT * 2)
-            for (gx in 0 until GRID_WIDTH) {
-                val x = (gx * 2 + 1) * image.width / (GRID_WIDTH * 2)
-                val offset = y * plane.rowStride + x * plane.pixelStride
-                val r = buffer.get(offset).toInt() and 0xFF
-                val g = buffer.get(offset + 1).toInt() and 0xFF
-                val b = buffer.get(offset + 2).toInt() and 0xFF
-                val luma = (r * 299 + g * 587 + b * 114) / 1000
-                current[gy * GRID_WIDTH + gx] = luma
-                sum += luma
-            }
-        }
-        val mean = sum / current.size
-        val previous = previousLuma
-        val previousMean = previousMeanLuma
-        previousLuma = current
-        previousMeanLuma = mean
-        if (previous == null) {
-            motionStreak = 0
-            return false
-        }
-
-        var changed = 0
-        for (i in current.indices) {
-            if (abs((current[i] - mean) - (previous[i] - previousMean)) > PIXEL_THRESHOLD) changed++
-        }
-        motionStreak = if (changed >= current.size * sensitivity.changedFraction) motionStreak + 1 else 0
-        // Exige duas conferências seguidas com mudança, para ignorar ruído e piscadas de luz.
-        return motionStreak >= MOTION_STREAK
-    }
+    private fun jpegQuality() = minOf(quality.jpegQuality, thermalLimit.maxJpegQuality)
 
     // Avisa o servidor com uma foto do momento; ele guarda o evento e manda a notificação.
     private fun sendMotion(image: ImageProxy) {
-        val snapshot = Base64.encodeToString(image.toJpeg(), Base64.NO_WRAP)
+        val snapshot = Base64.encodeToString(image.toJpeg(jpegQuality()), Base64.NO_WRAP)
         relay.sendMessage(JSONObject().put("type", "motion").put("snapshot", snapshot))
-    }
-
-    private fun ImageProxy.toJpeg(): ByteArray {
-        val plane = planes[0]
-        val rowPadding = plane.rowStride - plane.pixelStride * width
-        val raw = Bitmap.createBitmap(
-            width + rowPadding / plane.pixelStride,
-            height,
-            Bitmap.Config.ARGB_8888
-        )
-        plane.buffer.rewind()
-        raw.copyPixelsFromBuffer(plane.buffer)
-
-        val matrix = Matrix().apply { postRotate(imageInfo.rotationDegrees.toFloat()) }
-        val frame = Bitmap.createBitmap(raw, 0, 0, width, height, matrix, true)
-
-        val out = ByteArrayOutputStream()
-        frame.compress(Bitmap.CompressFormat.JPEG, minOf(quality.jpegQuality, thermalJpegQuality), out)
-        return out.toByteArray()
     }
 
     // Lê bateria e temperatura, ajusta a qualidade conforme o calor e avisa o servidor.
     private fun reportHealth() {
-        val battery = ContextCompat.registerReceiver(
-            this, null, IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED
-        ) ?: return
-        val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-        val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-        val status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-        // A temperatura vem em décimos de grau Celsius.
-        val temperature = battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
-            .takeIf { it != Int.MIN_VALUE }?.div(10.0)
-
-        applyThermalLimits(temperature)
-        if (!RelayClient.connected) return
-        val message = JSONObject()
-            .put("type", "health")
-            .put("charging", charging)
-            .put("throttled", isThrottled)
-        if (level >= 0 && scale > 0) message.put("battery", level * 100 / scale)
-        if (temperature != null) message.put("temperature", temperature)
-        relay.sendMessage(message)
-    }
-
-    // Celular quente: menos quadros e JPEG menor, para gerar menos calor. Volta ao normal ao esfriar.
-    private fun applyThermalLimits(temperature: Double?) {
-        val (interval, jpeg) = when {
-            temperature == null || temperature < WARM_CELSIUS -> 0L to 100
-            temperature < HOT_CELSIUS -> WARM_FRAME_INTERVAL_MS to WARM_JPEG_QUALITY
-            else -> HOT_FRAME_INTERVAL_MS to HOT_JPEG_QUALITY
-        }
-        thermalIntervalMs = interval
-        thermalJpegQuality = jpeg
-        isThrottled = interval > 0
+        val health = DeviceHealth.read(this) ?: return
+        thermalLimit = ThermalLimit.forTemperature(health.temperatureCelsius)
+        isThrottled = thermalLimit.throttled
+        if (RelayClient.connected) relay.sendMessage(health.toMessage(isThrottled))
     }
 
     private fun updateNotification() {
@@ -410,22 +318,12 @@ class StreamService : LifecycleService() {
         private const val KEY_SHOULD_RUN = "shouldRun"
         private const val HEALTH_INTERVAL_MS = 60_000L
 
-        // Limites por faixa de temperatura da bateria (somam-se à qualidade escolhida).
-        private const val WARM_CELSIUS = 40.0
-        private const val HOT_CELSIUS = 44.0
-        private const val WARM_FRAME_INTERVAL_MS = 250L // ~4 fps
-        private const val HOT_FRAME_INTERVAL_MS = 1_000L // 1 fps
-        private const val WARM_JPEG_QUALITY = 50
-        private const val HOT_JPEG_QUALITY = 40
-
-        // Detecção de movimento: grade de 32x24 pontos, diferença mínima de brilho por ponto,
-        // conferências seguidas exigidas e intervalo mínimo entre alertas (igual ao do servidor).
+        // Detecção de movimento: grade de 32x24 pontos conferida duas vezes por segundo e
+        // intervalo mínimo entre alertas (igual ao do servidor).
         private const val MOTION_CHECK_MS = 500L
         private const val MOTION_COOLDOWN_MS = 30_000L
-        private const val MOTION_STREAK = 2
-        private const val GRID_WIDTH = 32
-        private const val GRID_HEIGHT = 24
-        private const val PIXEL_THRESHOLD = 25
+        private const val GRID_COLUMNS = 32
+        private const val GRID_ROWS = 24
 
         @Volatile
         var isRunning = false

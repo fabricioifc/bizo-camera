@@ -12,6 +12,26 @@ Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadro
 4. No Google Cloud, crie também um cliente OAuth do tipo **Android** com o nome do pacote `br.dev.bizo.cameramonitor` e o SHA-1 da keystore de release. Sem ele, o seletor de conta não abre.
 5. Conecte o celular com depuração USB e clique em Run.
 
+## Testes
+
+Os testes de unidade (detecção de movimento, limite por calor e formato do PIN) rodam no computador, sem celular:
+
+```bash
+./gradlew testDebugUnitTest
+```
+
+O Gradle precisa de um JDK entre 17 e 23. O Android Studio já traz um (por exemplo, `jbr-21` em `~/.jdks`); aponte o `JAVA_HOME` para ele se o terminal usar outra versão.
+
+## Organização do código
+
+- `MainActivity`: tela principal (status, prévia, iniciar/parar, avisos).
+- `LoginController`: login com Google, código 2FA, configuração do 2FA e códigos de recuperação.
+- `SettingsActivity`: imagem, detecção de movimento, PIN e conta.
+- `StreamService`: serviço em primeiro plano que mantém a câmera e a conexão.
+- `MotionDetector`, `ThermalLimit`, `DeviceHealth`, `FrameConversion`: peças usadas pelo serviço.
+- `RelayClient`: login na API e conexão com o servidor.
+- `CameraSettings`, `PinLock`, `PinDialogs`, `BootReceiver`: configurações, PIN e retomada após reiniciar.
+
 ## Uso
 
 1. Toque em **Entrar com Google** e escolha a conta. Se a conta tiver verificação em duas etapas, digite o código do app autenticador. Se não tiver, configure o 2FA no próprio app, escaneando o QR code e guardando os códigos de recuperação.
