@@ -8,7 +8,7 @@ Liga a câmera (app Android) aos visualizadores (navegador). Também entrega o s
 | `frontend/` | Página em Vue 3 + Vite. Em produção vira arquivos estáticos (`frontend/dist`) servidos pelo backend. |
 | `scripts/` | Backup e restauração do volume de dados, usados pelo Docker. |
 
-**Portas.** Em produção só existe a **8787**: o backend serve a página, a API e a câmera. A **5173** é o servidor do Vite e só existe em desenvolvimento, para recarregar a página a cada alteração; ele encaminha a API e os WebSockets para a 8787. Por isso, em desenvolvimento, as duas ficam no ar: abra a página na 5173 e aponte o app Android para a 8787. A página que a 8787 mostra em desenvolvimento é a compilada quando a imagem foi construída, então pode estar desatualizada.
+**Portas.** Em produção só existe a **8787**: o backend serve a página, a API e a câmera. A **5173** é o servidor do Vite e só existe em desenvolvimento, para recarregar a página a cada alteração; ele encaminha a API e os WebSockets para a 8787. Por isso, em desenvolvimento, as duas ficam no ar: abra a página na 5173 e aponte o app Android para a 8787. Em desenvolvimento, a 8787 não serve a página.
 
 ## Rodar com Docker
 
@@ -45,7 +45,12 @@ Suba o relay e o frontend juntos:
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-Abra `http://localhost:5173` para usar a página. O backend e a conexão da câmera continuam na porta `8787`; use `http://IP_DO_COMPUTADOR:8787` no app Android debug. Alterações em `frontend/` aparecem na hora, sem rebuild. Alterações em `backend/` precisam de `docker compose -f docker-compose.dev.yml up -d --build relay`.
+Abra `http://localhost:5173` para usar a página. O backend e a conexão da câmera continuam na porta `8787`; use `http://IP_DO_COMPUTADOR:8787` no app Android debug. Os dois lados recarregam sozinhos, sem rebuild:
+
+- **frontend/**: o Vite atualiza a página aberta a cada alteração salva.
+- **backend/src/**: o nodemon reinicia o servidor a cada alteração salva (as câmeras e as páginas abertas reconectam sozinhas).
+
+Como a pasta do Windows montada no Docker não avisa o Linux das alterações, os dois conferem os arquivos periodicamente (`VITE_POLLING=1` no Vite, `--legacy-watch` no nodemon). Use `--build` só quando mudar dependências (`package.json`) ou um `Dockerfile.dev`.
 
 Para conectar o celular na mesma rede Wi-Fi:
 
@@ -71,7 +76,7 @@ Para apagar os dados junto com o volume, use `docker compose down -v`. Isso remo
 
 ### Desenvolvimento do frontend sem Docker
 
-Com o backend rodando na 8787 (pelo Compose de desenvolvimento ou com `npm start` em `backend/`):
+Com o backend rodando na 8787 (pelo Compose de desenvolvimento, ou com `npm run dev` em `backend/`, que reinicia a cada alteração):
 
 ```bash
 cd relay-server/frontend

@@ -1,0 +1,14 @@
+# Só para desenvolvimento: backend com reinício automático (nodemon) na porta 8787.
+# O código vem da pasta backend/src montada pelo docker-compose.dev.yml.
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+ENV PORT=8787 \
+    DATA_FILE=/data/db.json
+EXPOSE 8787
+
+CMD ["npm", "run", "dev"]

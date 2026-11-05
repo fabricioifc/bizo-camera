@@ -40,6 +40,13 @@ function createStaticHandler(webDir) {
       return res.end('Não encontrado');
     }
     fs.readFile(path.join(webDir, entry.file), (err, content) => {
+      if (err && err.code === 'ENOENT') {
+        // Sem a página compilada (no desenvolvimento, quem serve a página é o Vite).
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(pathname === '/'
+          ? 'Página não compilada. Em desenvolvimento, abra http://localhost:5173.'
+          : 'Não encontrado');
+      }
       if (err) {
         res.writeHead(500);
         return res.end();

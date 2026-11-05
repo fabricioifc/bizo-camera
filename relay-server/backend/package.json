@@ -6,6 +6,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "dev": "nodemon --legacy-watch --watch src src/server.js",
     "pretest": "npm --prefix ../frontend run build",
     "test": "node --test"
   },
@@ -16,5 +17,8 @@
     "qrcode": "^1.5.4",
     "web-push": "^3.6.7",
     "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

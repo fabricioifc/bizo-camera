@@ -12,6 +12,9 @@ export default defineConfig({
     host: process.env.VITE_HOST || '127.0.0.1',
     port: 5173,
     strictPort: true,
+    // No Docker com a pasta do Windows montada, o Linux não recebe os avisos de arquivo alterado:
+    // VITE_POLLING=1 faz o Vite conferir os arquivos periodicamente.
+    watch: process.env.VITE_POLLING === '1' ? { usePolling: true, interval: 300 } : undefined,
     proxy: {
       '/api': `http://${relay}:8787`,
       '/healthz': `http://${relay}:8787`,

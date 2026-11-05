@@ -1,8 +1,12 @@
-# Desenvolvimento: backend na porta 8787 e Vite (frontend com recarga automática) na 5173.
+# Desenvolvimento: backend na porta 8787 e Vite (frontend) na 5173, os dois com recarga automática.
 # Use a página em http://localhost:5173. A porta 8787 atende a API, os WebSockets e a câmera Android.
+# Alterações em backend/src reiniciam o backend; alterações em frontend/ aparecem na página na hora.
+# Rebuild (--build) só é preciso ao mudar dependências (package.json) ou os Dockerfile.dev.
 services:
   relay:
-    build: .
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
       # Aberta na rede local para o app Android debug conectar pelo IP do computador.
@@ -16,6 +20,8 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
+      # O código vem da pasta local; o nodemon reinicia o servidor a cada alteração.
+      - ./backend/src:/app/src
       - relay-data-dev:/data
 
   frontend:
@@ -30,6 +36,8 @@ services:
     environment:
       RELAY_HOST: relay
       VITE_HOST: 0.0.0.0
+      # A pasta do Windows montada não avisa o Linux das alterações: o Vite confere periodicamente.
+      VITE_POLLING: "1"
     volumes:
       # O código do frontend vem da pasta local; as dependências ficam no container.
       - ./frontend:/app
