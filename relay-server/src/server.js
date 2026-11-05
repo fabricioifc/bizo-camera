@@ -671,17 +671,35 @@ async function finishGoogleLogin(res, { code, attempt, redirectUri }) {
   return redirect(res, '/', { 'Set-Cookie': sessionCookie(token) });
 }
 
+// Versão de cada arquivo da página (hash do conteúdo). Muda a cada deploy, então o navegador
+// baixa o app.js e o styles.css novos em vez de reaproveitar os antigos do cache.
+const assetVersions = new Map();
+
+function assetVersion(file) {
+  if (!assetVersions.has(file)) {
+    assetVersions.set(file, sha256(fs.readFileSync(path.join(WEB_DIR, file))).slice(0, 10));
+  }
+  return assetVersions.get(file);
+}
+
+function withAssetVersions(html) {
+  return html
+    .replace('src="/app.js"', `src="/app.js?v=${assetVersion('app.js')}"`)
+    .replace('href="/styles.css"', `href="/styles.css?v=${assetVersion('styles.css')}"`);
+}
+
 function serveStatic(pathname, res) {
   const entry = STATIC_FILES.get(pathname);
   if (!entry) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     return res.end('Não encontrado');
   }
-  fs.readFile(path.join(WEB_DIR, entry.file), (err, data) => {
+  fs.readFile(path.join(WEB_DIR, entry.file), (err, content) => {
     if (err) {
       res.writeHead(500);
       return res.end();
     }
+    const data = entry.file === 'index.html' ? withAssetVersions(content.toString('utf8')) : content;
     res.writeHead(200, {
       'Content-Type': entry.type,
       'Cache-Control': 'no-cache',
