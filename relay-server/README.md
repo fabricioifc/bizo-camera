@@ -21,6 +21,16 @@ docker compose up -d --build
 
 O servidor fica em `http://localhost:8787`, publicado só em `127.0.0.1`. Os dados (usuários, câmeras e sessões) ficam no volume `relay-data`, então sobrevivem a rebuilds e reinícios.
 
+### Desenvolvimento local com login Google
+
+O `PUBLIC_URL` do `.env` é usado para construir o callback OAuth. Para desenvolver em `http://localhost:8787` sem alterar o endereço de produção, use o arquivo Compose de desenvolvimento:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+Esse arquivo Compose é independente e usa `http://localhost:8787` como endereço de callback e um volume de dados separado (`relay-data-dev`). No Google Cloud Console, adicione `http://localhost:8787/api/auth/google/callback` às URIs de redirecionamento autorizadas do cliente OAuth usado localmente. O navegador também deve abrir o endereço exatamente como `http://localhost:8787` (não `127.0.0.1`). Para voltar à configuração normal, execute `docker compose up -d --build relay`.
+
 Comandos úteis:
 
 ```bash

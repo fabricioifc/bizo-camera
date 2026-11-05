@@ -15,6 +15,7 @@ const PORT = Number(process.env.PORT || 8787);
 const PUBLIC_URL = (process.env.PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
 const ALLOW_SIGNUP = process.env.ALLOW_SIGNUP === '1';
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+const REQUIRE_2FA = process.env.REQUIRE_2FA !== '0';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_ENABLED = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
@@ -275,7 +276,7 @@ function requireFullSession(res, token) {
     sendJson(res, 401, { error: 'unauthorized' });
     return null;
   }
-  if (sessionPending(token)) {
+  if (REQUIRE_2FA && sessionPending(token)) {
     sendJson(res, 403, { error: 'two_factor_required' });
     return null;
   }
@@ -439,12 +440,12 @@ async function handleApi(req, res, url) {
     const entry = resolveGoogleAccount(claims);
     if (!entry) return sendJson(res, 403, { error: 'signup_disabled' });
     const [email, user] = entry;
-    if (twoFactorEnabled(user)) {
+    if (REQUIRE_2FA && twoFactorEnabled(user)) {
       return sendJson(res, 200, { mfaRequired: true, mfaToken: createMfaChallenge(email) });
     }
-    // Sem 2FA ativo, a sessão fica pendente: o app precisa configurar o 2FA antes de usar as câmeras.
-    const session = createSession(user.id, true);
-    return sendJson(res, 200, { token: session, email, pending: true });
+    const pending = REQUIRE_2FA && !twoFactorEnabled(user);
+    const session = createSession(user.id, pending);
+    return sendJson(res, 200, { token: session, email, pending });
   }
 
   if (route === 'POST /api/auth/logout') {
@@ -463,7 +464,7 @@ async function handleApi(req, res, url) {
       email: entry.email,
       google: Boolean(entry.user.googleId),
       twoFactor: twoFactorEnabled(entry.user),
-      pending: sessionPending(token),
+      pending: REQUIRE_2FA && sessionPending(token),
     });
   }
 
@@ -511,7 +512,7 @@ async function handleApi(req, res, url) {
   if (route === 'GET /api/devices') {
     const userId = sessionUserId(token);
     if (!userId) return sendJson(res, 401, { error: 'unauthorized' });
-    if (sessionPending(token)) return sendJson(res, 403, { error: 'two_factor_required' });
+    if (REQUIRE_2FA && sessionPending(token)) return sendJson(res, 403, { error: 'two_factor_required' });
     const devices = Object.entries(store.data.devices)
       .filter(([, device]) => device.ownerId === userId)
       .map(([id]) => deviceView(id));
@@ -566,7 +567,7 @@ async function handleApi(req, res, url) {
   if (route === 'POST /api/devices/register') {
     const userId = sessionUserId(token);
     if (!userId) return sendJson(res, 401, { error: 'unauthorized' });
-    if (sessionPending(token)) return sendJson(res, 403, { error: 'two_factor_required' });
+    if (REQUIRE_2FA && sessionPending(token)) return sendJson(res, 403, { error: 'two_factor_required' });
     const body = await readJson(req);
     const id = randomHex(8);
     const secret = randomHex(32);
@@ -708,13 +709,13 @@ async function finishGoogleLogin(res, { code, attempt, redirectUri }) {
   if (!entry) return redirect(res, '/#error=signup_disabled');
 
   const [accountEmail, user] = entry;
-  if (twoFactorEnabled(user)) {
+  if (REQUIRE_2FA && twoFactorEnabled(user)) {
     // O 2FA da conta continua valendo depois do Google. O código vai no fragmento da URL,
     // que o navegador não envia ao servidor.
     return redirect(res, `/#mfa=${createMfaChallenge(accountEmail)}`);
   }
-  // Login pelo Google exige 2FA. Sem 2FA ativo, a sessão fica pendente até a configuração.
-  const token = createSession(user.id, true);
+  // Sem 2FA ativo, sessões pendentes exigem configuração antes do acesso às câmeras.
+  const token = createSession(user.id, REQUIRE_2FA);
   return redirect(res, '/', { 'Set-Cookie': sessionCookie(token) });
 }
 
@@ -866,7 +867,7 @@ server.on('upgrade', (req, socket, head) => {
     const sessionToken = url.searchParams.get('token') || cookieToken(req);
     const userId = sessionUserId(sessionToken);
     const device = deviceId ? store.data.devices[deviceId] : undefined;
-    if (!userId || sessionPending(sessionToken) || !device || device.ownerId !== userId) {
+    if (!userId || (REQUIRE_2FA && sessionPending(sessionToken)) || !device || device.ownerId !== userId) {
       return reject(socket, '403 Forbidden');
     }
     return wss.handleUpgrade(req, socket, head, (ws) => attachViewer(deviceId, ws));
