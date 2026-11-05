@@ -34,6 +34,9 @@
     securityMessage: document.getElementById('security-message'),
     securityBack: document.getElementById('security-back'),
     listView: document.getElementById('list-view'),
+    alerts: document.getElementById('alerts'),
+    alertsText: document.getElementById('alerts-text'),
+    alertsButton: document.getElementById('alerts-button'),
     devices: document.getElementById('devices'),
     empty: document.getElementById('empty'),
     viewerView: document.getElementById('viewer-view'),
@@ -42,7 +45,13 @@
     viewerHealth: document.getElementById('viewer-health'),
     frame: document.getElementById('frame'),
     status: document.getElementById('viewer-status'),
+    events: document.getElementById('events'),
+    eventsEmpty: document.getElementById('events-empty'),
   };
+
+  const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  let swRegistration = null;
+  let openCameraId = null; // câmera a abrir depois de carregar a lista (vindo de uma notificação)
 
   let viewer = null; // { device, ws, closing, retryTimer }
   let listTimer = null;
@@ -276,14 +285,90 @@
     const health = document.createElement('span');
     showHealth(health, device.health);
 
+    const motion = document.createElement('span');
+    motion.className = 'hint';
+    motion.textContent = device.lastMotionAt ? `Último movimento: ${formatWhen(device.lastMotionAt)}` : '';
+    motion.hidden = !device.lastMotionAt;
+
     const button = document.createElement('button');
     button.textContent = 'Assistir';
     button.disabled = !device.online;
     button.addEventListener('click', () => openViewer(device));
 
-    card.append(top, state, health, button);
+    card.append(top, state, health, motion, button);
     return card;
   }
+
+  function formatWhen(at) {
+    const date = new Date(at);
+    const time = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (date.toDateString() === new Date().toDateString()) return `hoje às ${time}`;
+    return `${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${time}`;
+  }
+
+  // ----- Alertas de movimento (notificações do navegador) -----
+
+  async function registerServiceWorker() {
+    if (!pushSupported) return;
+    try {
+      swRegistration = await navigator.serviceWorker.register('/sw.js');
+    } catch {
+      swRegistration = null;
+    }
+  }
+
+  async function updateAlerts() {
+    if (!swRegistration) {
+      els.alerts.hidden = true;
+      return;
+    }
+    els.alerts.hidden = false;
+    const subscription = await swRegistration.pushManager.getSubscription();
+    els.alertsButton.hidden = Notification.permission === 'denied';
+    if (Notification.permission === 'denied') {
+      els.alertsText.textContent = 'Alertas bloqueados nas configurações do navegador.';
+    } else if (subscription) {
+      els.alertsText.textContent = 'Alertas de movimento ativados neste aparelho.';
+      els.alertsButton.textContent = 'Desativar';
+    } else {
+      els.alertsText.textContent = 'Receba um aviso neste aparelho quando houver movimento.';
+      els.alertsButton.textContent = 'Ativar alertas';
+    }
+  }
+
+  function base64UrlToBytes(text) {
+    const base64 = (text + '='.repeat((4 - (text.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+    return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  }
+
+  els.alertsButton.addEventListener('click', async () => {
+    els.alertsButton.disabled = true;
+    let error = null;
+    try {
+      const current = await swRegistration.pushManager.getSubscription();
+      if (current) {
+        await api('/api/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: current.endpoint }) });
+        await current.unsubscribe();
+      } else if ((await Notification.requestPermission()) === 'granted') {
+        const { publicKey } = await (await fetch('/api/push/key')).json();
+        const subscription = await swRegistration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64UrlToBytes(publicKey),
+        });
+        const res = await api('/api/push/subscribe', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
+        if (!res.ok) {
+          await subscription.unsubscribe();
+          error = await errorText(res);
+        }
+      }
+    } catch {
+      error = 'Não foi possível mudar os alertas neste navegador.';
+    } finally {
+      els.alertsButton.disabled = false;
+    }
+    await updateAlerts();
+    if (error) els.alertsText.textContent = error;
+  });
 
   // Bateria e temperatura do celular da câmera. Destaca bateria baixa e aquecimento.
   function showHealth(el, health) {
@@ -317,6 +402,10 @@
       const { devices } = await res.json();
       els.empty.hidden = devices.length > 0;
       els.devices.replaceChildren(...devices.map(deviceCard));
+      // Veio de uma notificação: abre direto a câmera que detectou o movimento.
+      const target = openCameraId && devices.find((device) => device.id === openCameraId);
+      openCameraId = null;
+      if (target) return openViewer(target);
     } catch {
       setConnection(false);
     }
@@ -365,6 +454,9 @@
           }
         } else if (msg.type === 'health') {
           showHealth(els.viewerHealth, msg.health);
+        } else if (msg.type === 'motion') {
+          els.events.prepend(eventItem(msg.event));
+          els.eventsEmpty.hidden = true;
         }
         return;
       }
@@ -389,6 +481,45 @@
     setViewerStatus('Conectando…');
     showView('viewer-view');
     connectViewer();
+    loadEvents(device.id);
+  }
+
+  // ----- Últimos movimentos -----
+
+  async function loadEvents(deviceId) {
+    els.events.replaceChildren();
+    els.eventsEmpty.hidden = true;
+    try {
+      const res = await api(`/api/devices/${encodeURIComponent(deviceId)}/events`);
+      if (!res.ok || viewer?.device.id !== deviceId) return;
+      const { events } = await res.json();
+      els.events.replaceChildren(...events.map(eventItem));
+      els.eventsEmpty.hidden = events.length > 0;
+    } catch {
+      // Sem rede: a lista fica vazia até abrir a câmera de novo.
+    }
+  }
+
+  function eventItem(event) {
+    const item = document.createElement('li');
+    item.className = 'event';
+    if (event.snapshot) {
+      const link = document.createElement('a');
+      link.href = `/api/events/${encodeURIComponent(event.id)}/snapshot`;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      const image = document.createElement('img');
+      image.src = link.href;
+      image.alt = 'Foto do movimento';
+      image.loading = 'lazy';
+      link.append(image);
+      item.append(link);
+    }
+    const when = document.createElement('span');
+    when.className = 'hint';
+    when.textContent = formatWhen(event.at);
+    item.append(when);
+    return item;
   }
 
   function closeViewer() {
@@ -421,11 +552,14 @@
     const [key, value] = hash.split('=');
     if (key === 'mfa' && value) return { mfaToken: decodeURIComponent(value) };
     if (key === 'error') return { error: `error=${value}` };
+    if (key === 'camera' && value) return { cameraId: decodeURIComponent(value) };
     return null;
   }
 
   async function init() {
     const fragment = readFragment();
+    if (fragment?.cameraId) openCameraId = fragment.cameraId;
+    registerServiceWorker().then(updateAlerts);
     try {
       await fetch('/api/config');
       setConnection(true);

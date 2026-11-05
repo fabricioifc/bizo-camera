@@ -9,6 +9,7 @@ const QRCode = require('qrcode');
 const { Store } = require('./store');
 const totp = require('./totp');
 const google = require('./google');
+const { setupPush } = require('./push');
 
 const PORT = Number(process.env.PORT || 8787);
 const PUBLIC_URL = (process.env.PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
@@ -29,6 +30,10 @@ const MAX_CODE_FAILURES = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 const RECOVERY_CODE_COUNT = 8;
 const MAX_BUFFERED_BYTES = 2 * 1024 * 1024;
+const MOTION_COOLDOWN_MS = 30_000; // no máximo um alerta por câmera a cada 30 s
+const MAX_EVENTS_PER_DEVICE = 50;
+const MAX_SNAPSHOT_BYTES = 512 * 1024;
+const MAX_PUSH_SUBSCRIPTIONS = 10;
 const OPEN = 1;
 const WEB_DIR = path.join(__dirname, '..', 'web');
 
@@ -36,9 +41,14 @@ const STATIC_FILES = new Map([
   ['/', { file: 'index.html', type: 'text/html; charset=utf-8' }],
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
   ['/styles.css', { file: 'styles.css', type: 'text/css; charset=utf-8' }],
+  ['/sw.js', { file: 'sw.js', type: 'text/javascript; charset=utf-8' }],
 ]);
 
-const store = new Store(process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'db.json'));
+const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'db.json');
+const SNAPSHOT_DIR = path.join(path.dirname(DATA_FILE), 'snapshots');
+const store = new Store(DATA_FILE);
+const push = setupPush({ dataDir: path.dirname(DATA_FILE), publicUrl: PUBLIC_URL });
+const lastMotionAt = new Map(); // deviceId -> momento do último alerta
 const deviceSockets = new Map(); // deviceId -> WebSocket da câmera
 const viewerSockets = new Map(); // deviceId -> Set<WebSocket> dos visualizadores
 const deviceHealth = new Map(); // deviceId -> { battery, charging, temperature, throttled, updatedAt }
@@ -191,7 +201,96 @@ function authenticateDevice(deviceId, secret) {
 function deviceView(id) {
   const device = store.data.devices[id];
   const online = deviceSockets.has(id);
-  return { id, name: device.name, online, health: online ? deviceHealth.get(id) || null : null };
+  const lastEvent = store.data.events.findLast((event) => event.deviceId === id);
+  return {
+    id,
+    name: device.name,
+    online,
+    health: online ? deviceHealth.get(id) || null : null,
+    lastMotionAt: lastEvent ? lastEvent.at : null,
+  };
+}
+
+function eventView(event) {
+  return { id: event.id, at: event.at, snapshot: event.snapshot };
+}
+
+const snapshotPath = (eventId) => path.join(SNAPSHOT_DIR, `${eventId}.jpg`);
+
+// Foto do movimento, enviada pela câmera em base64. Só aceita JPEG de tamanho razoável.
+function saveSnapshot(eventId, base64) {
+  if (typeof base64 !== 'string' || base64.length > Math.ceil(MAX_SNAPSHOT_BYTES / 3) * 4) return false;
+  const jpeg = Buffer.from(base64, 'base64');
+  if (jpeg.length < 4 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8) return false;
+  fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
+  fs.writeFileSync(snapshotPath(eventId), jpeg);
+  return true;
+}
+
+// Movimento: guarda o evento (com foto), avisa quem está assistindo e manda notificação ao dono.
+function recordMotion(deviceId, message) {
+  const now = Date.now();
+  if (now - (lastMotionAt.get(deviceId) || 0) < MOTION_COOLDOWN_MS) return;
+  lastMotionAt.set(deviceId, now);
+
+  const id = randomHex(8);
+  const event = { id, deviceId, at: now, snapshot: saveSnapshot(id, message.snapshot) };
+  store.data.events.push(event);
+
+  // Mantém só os eventos mais recentes de cada câmera, apagando as fotos antigas.
+  const own = store.data.events.filter((item) => item.deviceId === deviceId);
+  if (own.length > MAX_EVENTS_PER_DEVICE) {
+    const removed = own.slice(0, own.length - MAX_EVENTS_PER_DEVICE);
+    const removedIds = new Set(removed.map((item) => item.id));
+    for (const item of removed) if (item.snapshot) fs.rm(snapshotPath(item.id), { force: true }, () => {});
+    store.data.events = store.data.events.filter((item) => !removedIds.has(item.id));
+  }
+  store.save();
+
+  notifyViewers(deviceId, { type: 'motion', event: eventView(event) });
+  notifyMotion(deviceId, event).catch(() => {});
+}
+
+async function notifyMotion(deviceId, event) {
+  const device = store.data.devices[deviceId];
+  const subscriptions = device ? store.data.push[device.ownerId] || [] : [];
+  if (subscriptions.length === 0) return;
+  const payload = { title: 'Movimento detectado', device: device.name, deviceId, at: event.at, eventId: event.id };
+  const delivered = await Promise.all(subscriptions.map((subscription) => push.send(subscription, payload)));
+  // Remove assinaturas que o navegador cancelou.
+  const alive = subscriptions.filter((_, index) => delivered[index]);
+  if (alive.length !== subscriptions.length) {
+    store.data.push[device.ownerId] = alive;
+    store.save();
+  }
+}
+
+// Usuário dono da sessão e com 2FA concluído; responde o erro e devolve null se não for.
+function requireFullSession(res, token) {
+  const userId = sessionUserId(token);
+  if (!userId) {
+    sendJson(res, 401, { error: 'unauthorized' });
+    return null;
+  }
+  if (sessionPending(token)) {
+    sendJson(res, 403, { error: 'two_factor_required' });
+    return null;
+  }
+  return userId;
+}
+
+function isValidSubscription(subscription) {
+  return Boolean(
+    subscription &&
+      typeof subscription.endpoint === 'string' &&
+      subscription.endpoint.startsWith('https://') &&
+      subscription.endpoint.length < 2000 &&
+      subscription.keys &&
+      typeof subscription.keys.p256dh === 'string' &&
+      typeof subscription.keys.auth === 'string' &&
+      subscription.keys.p256dh.length < 200 &&
+      subscription.keys.auth.length < 100,
+  );
 }
 
 // Saúde enviada pela câmera. Só aceita campos conhecidos, com valores plausíveis.
@@ -220,6 +319,8 @@ function handleDeviceMessage(deviceId, data) {
     const health = parseHealth(message);
     deviceHealth.set(deviceId, health);
     notifyViewers(deviceId, { type: 'health', health });
+  } else if (message && message.type === 'motion') {
+    recordMotion(deviceId, message);
   }
 }
 
@@ -430,6 +531,69 @@ async function handleApi(req, res, url) {
     };
     store.save();
     return sendJson(res, 201, { deviceId: id, deviceSecret: secret });
+  }
+
+  // ----- Alertas de movimento (Web Push) -----
+
+  if (route === 'GET /api/push/key') {
+    return sendJson(res, 200, { publicKey: push.publicKey });
+  }
+
+  if (route === 'POST /api/push/subscribe') {
+    const userId = requireFullSession(res, token);
+    if (!userId) return;
+    const body = await readJson(req);
+    if (!isValidSubscription(body)) return sendJson(res, 400, { error: 'invalid_subscription' });
+    const subscription = { endpoint: body.endpoint, keys: { p256dh: body.keys.p256dh, auth: body.keys.auth } };
+    const others = (store.data.push[userId] || []).filter((item) => item.endpoint !== subscription.endpoint);
+    store.data.push[userId] = [...others, subscription].slice(-MAX_PUSH_SUBSCRIPTIONS);
+    store.save();
+    return sendJson(res, 201, { ok: true });
+  }
+
+  if (route === 'POST /api/push/unsubscribe') {
+    const userId = requireFullSession(res, token);
+    if (!userId) return;
+    const body = await readJson(req);
+    store.data.push[userId] = (store.data.push[userId] || []).filter((item) => item.endpoint !== body.endpoint);
+    store.save();
+    return sendJson(res, 200, { ok: true });
+  }
+
+  // Últimos movimentos de uma câmera da conta.
+  const eventsMatch = url.pathname.match(/^\/api\/devices\/([a-f0-9]{16})\/events$/);
+  if (req.method === 'GET' && eventsMatch) {
+    const userId = requireFullSession(res, token);
+    if (!userId) return;
+    const device = store.data.devices[eventsMatch[1]];
+    if (!device || device.ownerId !== userId) return sendJson(res, 404, { error: 'not_found' });
+    const events = store.data.events
+      .filter((event) => event.deviceId === eventsMatch[1])
+      .slice(-20)
+      .reverse()
+      .map(eventView);
+    return sendJson(res, 200, { events });
+  }
+
+  // Foto de um movimento: só para o dono da câmera.
+  const snapshotMatch = url.pathname.match(/^\/api\/events\/([a-f0-9]{16})\/snapshot$/);
+  if (req.method === 'GET' && snapshotMatch) {
+    const userId = requireFullSession(res, token);
+    if (!userId) return;
+    const event = store.data.events.find((item) => item.id === snapshotMatch[1]);
+    const device = event ? store.data.devices[event.deviceId] : undefined;
+    if (!event || !event.snapshot || !device || device.ownerId !== userId) {
+      return sendJson(res, 404, { error: 'not_found' });
+    }
+    return fs.readFile(snapshotPath(event.id), (err, data) => {
+      if (err) return sendJson(res, 404, { error: 'not_found' });
+      res.writeHead(200, {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'private, max-age=86400',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      res.end(data);
+    });
   }
 
   return sendJson(res, 404, { error: 'not_found' });

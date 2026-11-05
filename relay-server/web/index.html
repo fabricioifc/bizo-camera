@@ -80,6 +80,10 @@
     </section>
 
     <section id="list-view" hidden>
+      <div id="alerts" class="alerts" hidden>
+        <span id="alerts-text" class="hint"></span>
+        <button id="alerts-button" type="button" class="secondary"></button>
+      </div>
       <div id="devices" class="cards"></div>
       <p id="empty" class="hint" hidden>Nenhuma câmera registrada nesta conta. Faça login no app da câmera.</p>
     </section>
@@ -94,6 +98,9 @@
         <img id="frame" alt="Transmissão ao vivo" hidden>
         <p id="viewer-status" class="hint">Conectando…</p>
       </div>
+      <h2 class="events-title">Últimos movimentos</h2>
+      <p id="events-empty" class="hint" hidden>Nenhum movimento registrado.</p>
+      <ul id="events" class="events"></ul>
     </section>
   </main>
 

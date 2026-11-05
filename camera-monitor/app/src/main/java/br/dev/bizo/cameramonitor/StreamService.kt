@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.util.Base64
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
@@ -32,6 +33,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.abs
 
 /**
  * Serviço em primeiro plano: mantém a câmera ativa e a conexão com o servidor
@@ -54,9 +56,23 @@ class StreamService : LifecycleService() {
     @Volatile private var thermalJpegQuality = 100
     private var cameraState: LiveData<CameraState>? = null
 
+    // Detecção de movimento (roda na thread de análise dos quadros).
+    @Volatile private var motionEnabled = true
+    @Volatile private var sensitivity = Sensitivity.MEDIUM
+    @Volatile private var previousLuma: IntArray? = null
+    private var previousMeanLuma = 0
+    private var motionStreak = 0
+    private var lastMotionCheckAt = 0L
+    private var lastMotionSentAt = 0L
+
     // Lente ou qualidade alteradas no app: troca a câmera sem parar a transmissão.
-    private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-        handler.post { if (cameraStarted) startCamera() }
+    // Detecção de movimento: vale na hora, sem religar a câmera.
+    private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (CameraSettings.affectsCamera(key)) {
+            handler.post { if (cameraStarted) startCamera() }
+        } else {
+            loadMotionSettings()
+        }
     }
 
     // Atualiza a notificação quando a conexão muda e envia a saúde logo após conectar.
@@ -87,6 +103,12 @@ class StreamService : LifecycleService() {
         relay = RelayClient(this)
         RelayClient.addListener(relayListener)
         CameraSettings.prefs(this).registerOnSharedPreferenceChangeListener(settingsListener)
+        loadMotionSettings()
+    }
+
+    private fun loadMotionSettings() {
+        motionEnabled = CameraSettings.motionEnabled(this)
+        sensitivity = CameraSettings.sensitivity(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -197,6 +219,8 @@ class StreamService : LifecycleService() {
             val selector = if (available) lens else CameraSelector.DEFAULT_BACK_CAMERA
             val camera = provider.bindToLifecycle(this, selector, analysis)
             // Erro grave (ex.: câmera bloqueada pelo sistema por ter sido aberta em segundo plano).
+            // Câmera ou enquadramento novos: a próxima comparação de movimento recomeça do zero.
+            previousLuma = null
             cameraState?.removeObservers(this)
             cameraState = camera.cameraInfo.cameraState
             camera.cameraInfo.cameraState.observe(this) { state ->
@@ -212,6 +236,14 @@ class StreamService : LifecycleService() {
     private fun onFrame(image: ImageProxy) {
         try {
             val now = System.currentTimeMillis()
+            // Movimento: confere duas vezes por segundo, mesmo sem ninguém assistindo.
+            if (motionEnabled && RelayClient.connected && now - lastMotionCheckAt >= MOTION_CHECK_MS) {
+                lastMotionCheckAt = now
+                if (detectMotion(image) && now - lastMotionSentAt >= MOTION_COOLDOWN_MS) {
+                    lastMotionSentAt = now
+                    sendMotion(image)
+                }
+            }
             // Sem visualizador, não gasta CPU nem dados convertendo quadros.
             val interval = maxOf(quality.frameIntervalMs, thermalIntervalMs)
             if (!RelayClient.streaming || now - lastFrameAt < interval) return
@@ -222,6 +254,51 @@ class StreamService : LifecycleService() {
         } finally {
             image.close()
         }
+    }
+
+    // Compara uma grade de pontos com a da conferência anterior. Desconta a variação geral
+    // de brilho (luz acesa, exposição automática) para não confundir com movimento.
+    private fun detectMotion(image: ImageProxy): Boolean {
+        val plane = image.planes[0]
+        val buffer = plane.buffer
+        val current = IntArray(GRID_WIDTH * GRID_HEIGHT)
+        var sum = 0
+        for (gy in 0 until GRID_HEIGHT) {
+            val y = (gy * 2 + 1) * image.height / (GRID_HEIGHT * 2)
+            for (gx in 0 until GRID_WIDTH) {
+                val x = (gx * 2 + 1) * image.width / (GRID_WIDTH * 2)
+                val offset = y * plane.rowStride + x * plane.pixelStride
+                val r = buffer.get(offset).toInt() and 0xFF
+                val g = buffer.get(offset + 1).toInt() and 0xFF
+                val b = buffer.get(offset + 2).toInt() and 0xFF
+                val luma = (r * 299 + g * 587 + b * 114) / 1000
+                current[gy * GRID_WIDTH + gx] = luma
+                sum += luma
+            }
+        }
+        val mean = sum / current.size
+        val previous = previousLuma
+        val previousMean = previousMeanLuma
+        previousLuma = current
+        previousMeanLuma = mean
+        if (previous == null) {
+            motionStreak = 0
+            return false
+        }
+
+        var changed = 0
+        for (i in current.indices) {
+            if (abs((current[i] - mean) - (previous[i] - previousMean)) > PIXEL_THRESHOLD) changed++
+        }
+        motionStreak = if (changed >= current.size * sensitivity.changedFraction) motionStreak + 1 else 0
+        // Exige duas conferências seguidas com mudança, para ignorar ruído e piscadas de luz.
+        return motionStreak >= MOTION_STREAK
+    }
+
+    // Avisa o servidor com uma foto do momento; ele guarda o evento e manda a notificação.
+    private fun sendMotion(image: ImageProxy) {
+        val snapshot = Base64.encodeToString(image.toJpeg(), Base64.NO_WRAP)
+        relay.sendMessage(JSONObject().put("type", "motion").put("snapshot", snapshot))
     }
 
     private fun ImageProxy.toJpeg(): ByteArray {
@@ -340,6 +417,15 @@ class StreamService : LifecycleService() {
         private const val HOT_FRAME_INTERVAL_MS = 1_000L // 1 fps
         private const val WARM_JPEG_QUALITY = 50
         private const val HOT_JPEG_QUALITY = 40
+
+        // Detecção de movimento: grade de 32x24 pontos, diferença mínima de brilho por ponto,
+        // conferências seguidas exigidas e intervalo mínimo entre alertas (igual ao do servidor).
+        private const val MOTION_CHECK_MS = 500L
+        private const val MOTION_COOLDOWN_MS = 30_000L
+        private const val MOTION_STREAK = 2
+        private const val GRID_WIDTH = 32
+        private const val GRID_HEIGHT = 24
+        private const val PIXEL_THRESHOLD = 25
 
         @Volatile
         var isRunning = false

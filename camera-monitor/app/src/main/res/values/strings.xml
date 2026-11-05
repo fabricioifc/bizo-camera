@@ -47,6 +47,13 @@
 
     <string name="image_locked_hint">Pare a câmera para mudar a imagem.</string>
 
+    <!-- Detecção de movimento -->
+    <string name="motion_title">Detecção de movimento</string>
+    <string name="motion_sensitivity_label">Sensibilidade</string>
+    <string name="motion_on_hint">Ao detectar movimento, a câmera guarda uma foto e envia um alerta para os navegadores onde você ativou os alertas no site.</string>
+    <string name="motion_off_hint">Desligada: nenhum movimento é registrado.</string>
+    <string name="motion_locked_hint">Pare a câmera para mudar a detecção.</string>
+
     <!-- Proteção por PIN -->
     <string name="protection_title">Proteção</string>
     <string name="protection_off">Sem PIN, qualquer pessoa com acesso ao celular pode parar a câmera.</string>

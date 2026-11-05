@@ -10,13 +10,16 @@ const path = require('node:path');
 class Store {
   constructor(file) {
     this.file = file;
-    this.data = { users: {}, sessions: {}, devices: {} };
+    // events: movimentos detectados; push: assinaturas de notificação por usuário.
+    this.data = { users: {}, sessions: {}, devices: {}, events: [], push: {} };
     try {
       const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
       this.data = {
         users: saved.users || {},
         sessions: saved.sessions || {},
         devices: saved.devices || {},
+        events: saved.events || [],
+        push: saved.push || {},
       };
     } catch (err) {
       if (err.code !== 'ENOENT') throw err;

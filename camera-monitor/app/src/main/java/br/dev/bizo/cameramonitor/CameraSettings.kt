@@ -18,11 +18,36 @@ enum class Quality(val resolution: Size, val frameIntervalMs: Long, val jpegQual
     HIGH(Size(1280, 720), 100L, 70), // ~10 fps em HD; precisa de Wi-Fi bom
 }
 
+/** Sensibilidade da detecção: fração da imagem que precisa mudar para contar como movimento. */
+enum class Sensitivity(val changedFraction: Float) {
+    LOW(0.08f),
+    MEDIUM(0.04f),
+    HIGH(0.02f),
+}
+
 /** Configurações da câmera, salvas no aparelho. */
 object CameraSettings {
     private const val PREFS = "camera_settings"
     private const val KEY_LENS = "lens"
     private const val KEY_QUALITY = "quality"
+    private const val KEY_MOTION = "motion"
+    private const val KEY_SENSITIVITY = "sensitivity"
+
+    /** Lente e qualidade exigem religar a câmera; as demais configurações valem na hora. */
+    fun affectsCamera(key: String?) = key == KEY_LENS || key == KEY_QUALITY
+
+    fun motionEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_MOTION, true)
+
+    fun setMotionEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_MOTION, enabled).apply()
+    }
+
+    fun sensitivity(context: Context): Sensitivity =
+        enumValue(prefs(context).getString(KEY_SENSITIVITY, null), Sensitivity.MEDIUM)
+
+    fun setSensitivity(context: Context, sensitivity: Sensitivity) {
+        prefs(context).edit().putString(KEY_SENSITIVITY, sensitivity.name).apply()
+    }
 
     fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

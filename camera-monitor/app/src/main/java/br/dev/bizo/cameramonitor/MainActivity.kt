@@ -123,6 +123,7 @@ class MainActivity : AppCompatActivity() {
             previewPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
         setUpImageSettings()
+        setUpMotionSettings()
         showStep(Step.SIGN_IN)
     }
 
@@ -402,6 +403,19 @@ class MainActivity : AppCompatActivity() {
         setGroupEnabled(binding.qualityGroup, !imageLocked)
         if (imageLocked) binding.qualityHint.setText(R.string.image_locked_hint) else updateQualityHint()
 
+        // Desligar a detecção também enfraquece a vigilância: segue a mesma trava do PIN.
+        val motionOn = CameraSettings.motionEnabled(this)
+        binding.motionCard.visibility = visibleIf(signedIn)
+        binding.motionSwitch.isEnabled = !imageLocked
+        setGroupEnabled(binding.sensitivityGroup, !imageLocked && motionOn)
+        binding.motionHint.setText(
+            when {
+                imageLocked -> R.string.motion_locked_hint
+                motionOn -> R.string.motion_on_hint
+                else -> R.string.motion_off_hint
+            }
+        )
+
         val pinSet = PinLock.isSet(this)
         binding.protectionCard.visibility = visibleIf(signedIn)
         binding.protectionStatus.setText(if (pinSet) R.string.protection_on else R.string.protection_off)
@@ -441,6 +455,30 @@ class MainActivity : AppCompatActivity() {
             }
             CameraSettings.setQuality(this, quality)
             updateQualityHint()
+        }
+    }
+
+    private fun setUpMotionSettings() {
+        binding.motionSwitch.isChecked = CameraSettings.motionEnabled(this)
+        binding.sensitivityGroup.check(
+            when (CameraSettings.sensitivity(this)) {
+                Sensitivity.LOW -> R.id.sensitivityLow
+                Sensitivity.MEDIUM -> R.id.sensitivityMedium
+                Sensitivity.HIGH -> R.id.sensitivityHigh
+            }
+        )
+        binding.motionSwitch.setOnCheckedChangeListener { _, checked ->
+            CameraSettings.setMotionEnabled(this, checked)
+            refresh()
+        }
+        binding.sensitivityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val sensitivity = when (checkedId) {
+                R.id.sensitivityLow -> Sensitivity.LOW
+                R.id.sensitivityHigh -> Sensitivity.HIGH
+                else -> Sensitivity.MEDIUM
+            }
+            CameraSettings.setSensitivity(this, sensitivity)
         }
     }
 

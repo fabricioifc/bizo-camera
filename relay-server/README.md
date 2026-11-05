@@ -86,6 +86,14 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 - Login, cadastro e códigos 2FA têm limite de tentativas por IP, por minuto.
 - Cada código TOTP vale uma vez e códigos de recuperação são apagados depois de usados.
 
+## Alertas de movimento
+
+- O app da câmera detecta movimento e envia um evento com uma foto. O servidor aceita no máximo um alerta por câmera a cada 30 segundos e guarda os 50 eventos mais recentes de cada câmera.
+- As fotos ficam em `snapshots/`, ao lado do banco (no Docker, dentro do volume `relay-data`). Só o dono da câmera consegue abri-las.
+- Para receber notificações, toque em **Ativar alertas** na lista de câmeras, em cada navegador ou celular onde quer o aviso. O navegador pede permissão.
+- As notificações usam Web Push. As chaves VAPID são geradas na primeira execução e salvas em `vapid.json`, também ao lado do banco. Se esse arquivo for apagado, os alertas precisam ser ativados de novo em cada aparelho.
+- No iPhone, as notificações só funcionam com o site adicionado à tela de início (iOS 16.4 ou mais novo).
+
 ## Endpoints
 
 - `GET /api/config`: diz se o cadastro está aberto (`signupOpen`) e se o Google está ativo (`googleEnabled`).
@@ -98,8 +106,12 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 - `POST /api/account/2fa/enable`: confirma o código e devolve os códigos de recuperação.
 - `POST /api/account/2fa/disable`: desativa o 2FA com senha (se houver) e um código.
 - `POST /api/devices/register`: a câmera, logada na conta, se registra e recebe `deviceId` e `deviceSecret`.
-- `GET /api/devices`: lista as câmeras da conta e o status online.
-- `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`.
-- `WS /ws/view?device=...`: conexão do visualizador da conta, que recebe os quadros JPEG. Usa o cookie de sessão.
+- `GET /api/devices`: lista as câmeras da conta, o status online, a saúde do aparelho e o último movimento.
+- `GET /api/devices/:id/events`: últimos 20 movimentos da câmera.
+- `GET /api/events/:id/snapshot`: foto de um movimento.
+- `GET /api/push/key`: chave pública VAPID para assinar as notificações.
+- `POST /api/push/subscribe` e `POST /api/push/unsubscribe`: ativa ou desativa os alertas neste navegador.
+- `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`. Além dos quadros, recebe mensagens `health` e `motion`.
+- `WS /ws/view?device=...`: conexão do visualizador da conta, que recebe os quadros JPEG, a saúde e os movimentos ao vivo. Usa o cookie de sessão.
 
 A sessão da web fica num cookie `HttpOnly`, então o JavaScript da página não consegue lê-la. O app Android usa o token do corpo da resposta, no cabeçalho `Authorization: Bearer`.
