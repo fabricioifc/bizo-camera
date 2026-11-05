@@ -17,10 +17,14 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import br.dev.bizo.cameramonitor.databinding.ActivityMainBinding
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
@@ -45,6 +49,14 @@ class MainActivity : AppCompatActivity() {
     private var statusNotice: String? = null
 
     private val relayListener: () -> Unit = { runOnUiThread { refresh() } }
+
+    // Prévia da câmera ligada na tela (só com a transmissão parada).
+    private var preview: Preview? = null
+    private var previewLens: Lens? = null
+
+    private val previewPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refresh() }
 
     // Atualiza o tempo de conexão na tela enquanto o app está aberto.
     private val ticker = object : Runnable {
@@ -89,6 +101,10 @@ class MainActivity : AppCompatActivity() {
             refresh()
         }
         binding.batteryButton.setOnClickListener { requestBatteryExemption() }
+        binding.previewPermissionButton.setOnClickListener {
+            previewPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+        setUpImageSettings()
         showStep(Step.SIGN_IN)
     }
 
@@ -297,6 +313,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startStreaming() {
+        // A câmera tem um dono por vez: a prévia sai para o serviço transmitir.
+        releasePreview()
         // Registra o aparelho antes de subir o serviço, para ele já conectar.
         binding.toggleButton.isEnabled = false
         io.execute {
@@ -359,6 +377,97 @@ class MainActivity : AppCompatActivity() {
 
         binding.loginPanel.visibility = visibleIf(!signedIn)
         binding.signOutButton.visibility = visibleIf(signedIn && !running)
+        binding.imageCard.visibility = visibleIf(signedIn)
+        updatePreview()
+    }
+
+    // Lente e qualidade: salvas no aparelho; o serviço troca a câmera ao vivo se estiver transmitindo.
+    private fun setUpImageSettings() {
+        binding.lensGroup.check(
+            when (CameraSettings.lens(this)) {
+                Lens.BACK -> R.id.lensBack
+                Lens.FRONT -> R.id.lensFront
+            }
+        )
+        binding.qualityGroup.check(
+            when (CameraSettings.quality(this)) {
+                Quality.LOW -> R.id.qualityLow
+                Quality.MEDIUM -> R.id.qualityMedium
+                Quality.HIGH -> R.id.qualityHigh
+            }
+        )
+        updateQualityHint()
+
+        binding.lensGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            CameraSettings.setLens(this, if (checkedId == R.id.lensFront) Lens.FRONT else Lens.BACK)
+            updatePreview()
+        }
+        binding.qualityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val quality = when (checkedId) {
+                R.id.qualityLow -> Quality.LOW
+                R.id.qualityHigh -> Quality.HIGH
+                else -> Quality.MEDIUM
+            }
+            CameraSettings.setQuality(this, quality)
+            updateQualityHint()
+        }
+    }
+
+    private fun updateQualityHint() {
+        binding.qualityHint.setText(
+            when (CameraSettings.quality(this)) {
+                Quality.LOW -> R.string.quality_low_hint
+                Quality.MEDIUM -> R.string.quality_medium_hint
+                Quality.HIGH -> R.string.quality_high_hint
+            }
+        )
+    }
+
+    // Mostra a prévia com a câmera parada; libera a câmera quando a transmissão começa.
+    private fun updatePreview() {
+        val wanted = relay.isSignedIn && !StreamService.isRunning
+        val permitted = hasCameraPermission()
+        binding.previewCard.visibility = visibleIf(wanted)
+        binding.previewView.visibility = visibleIf(wanted && permitted)
+        binding.previewPermission.visibility = visibleIf(wanted && !permitted)
+
+        val providerFuture = ProcessCameraProvider.getInstance(this)
+        providerFuture.addListener({
+            val provider = providerFuture.get()
+            val current = preview
+            val bound = current != null && provider.isBound(current)
+            val show = wanted && permitted && !StreamService.isRunning &&
+                lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            val lens = CameraSettings.lens(this)
+
+            if (!show) {
+                if (bound) current?.let { provider.unbind(it) }
+                preview = null
+                return@addListener
+            }
+            if (bound && previewLens == lens) return@addListener
+            if (bound) current?.let { provider.unbind(it) }
+
+            val available = runCatching { provider.hasCamera(lens.selector) }.getOrDefault(false)
+            val selector = if (available) lens.selector else CameraSelector.DEFAULT_BACK_CAMERA
+            val newPreview = Preview.Builder().build().also { it.setSurfaceProvider(binding.previewView.surfaceProvider) }
+            preview = try {
+                provider.bindToLifecycle(this, selector, newPreview)
+                previewLens = lens
+                newPreview
+            } catch (e: Exception) {
+                null
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun releasePreview() {
+        val current = preview ?: return
+        preview = null
+        val providerFuture = ProcessCameraProvider.getInstance(this)
+        providerFuture.addListener({ providerFuture.get().unbind(current) }, ContextCompat.getMainExecutor(this))
     }
 
     private fun formatDuration(ms: Long): String {

@@ -30,6 +30,21 @@
     <string name="duration_minutes">%1$d min</string>
     <string name="duration_hours">%1$d h %2$d min</string>
 
+    <!-- Prévia e imagem -->
+    <string name="preview_permission">Permita o uso da câmera para ver a prévia.</string>
+    <string name="preview_permission_button">Permitir câmera</string>
+    <string name="image_title">Imagem</string>
+    <string name="image_lens_label">Câmera</string>
+    <string name="lens_back">Traseira</string>
+    <string name="lens_front">Frontal</string>
+    <string name="image_quality_label">Qualidade</string>
+    <string name="quality_low">Baixa</string>
+    <string name="quality_medium">Média</string>
+    <string name="quality_high">Alta</string>
+    <string name="quality_low_hint">320×240, cerca de 5 quadros por segundo. Gasta pouco dado no 4G.</string>
+    <string name="quality_medium_hint">640×480, cerca de 10 quadros por segundo. Bom equilíbrio.</string>
+    <string name="quality_high_hint">1280×720, cerca de 10 quadros por segundo. Use com Wi-Fi bom.</string>
+
     <!-- Economia de bateria -->
     <string name="battery_title">Deixe a câmera funcionar em segundo plano</string>
     <string name="battery_detail">Com a economia de bateria ativa, o Android pode encerrar a transmissão com a tela apagada.</string>

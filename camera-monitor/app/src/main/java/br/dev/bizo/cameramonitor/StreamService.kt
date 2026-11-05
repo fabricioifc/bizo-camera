@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -18,7 +19,6 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
-import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
 import androidx.camera.core.ImageAnalysis
@@ -27,6 +27,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.LiveData
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
@@ -47,9 +48,16 @@ class StreamService : LifecycleService() {
     private val handler = Handler(Looper.getMainLooper())
     private var wasConnected = false
 
-    // Intervalo entre quadros e qualidade do JPEG; mudam quando o celular esquenta.
-    @Volatile private var frameIntervalMs = NORMAL_FRAME_INTERVAL_MS
-    @Volatile private var jpegQuality = NORMAL_JPEG_QUALITY
+    // Qualidade escolhida pelo usuário e o limite imposto pelo calor; vale o mais econômico dos dois.
+    @Volatile private var quality = Quality.MEDIUM
+    @Volatile private var thermalIntervalMs = 0L
+    @Volatile private var thermalJpegQuality = 100
+    private var cameraState: LiveData<CameraState>? = null
+
+    // Lente ou qualidade alteradas no app: troca a câmera sem parar a transmissão.
+    private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        handler.post { if (cameraStarted) startCamera() }
+    }
 
     // Atualiza a notificação quando a conexão muda e envia a saúde logo após conectar.
     private val relayListener: () -> Unit = {
@@ -78,6 +86,7 @@ class StreamService : LifecycleService() {
         }
         relay = RelayClient(this)
         RelayClient.addListener(relayListener)
+        CameraSettings.prefs(this).registerOnSharedPreferenceChangeListener(settingsListener)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -117,6 +126,7 @@ class StreamService : LifecycleService() {
         isThrottled = false
         cameraStarted = false
         handler.removeCallbacks(healthTicker)
+        CameraSettings.prefs(this).unregisterOnSharedPreferenceChangeListener(settingsListener)
         RelayClient.removeListener(relayListener)
         relay.stop()
         releaseLocks()
@@ -164,22 +174,31 @@ class StreamService : LifecycleService() {
         wifiLock = null
     }
 
+    // Liga (ou religa) a câmera com a lente e a qualidade salvas no app.
     private fun startCamera() {
         val providerFuture = ProcessCameraProvider.getInstance(this)
         providerFuture.addListener({
+            if (!cameraStarted) return@addListener
             val provider = providerFuture.get()
-            val executor = Executors.newSingleThreadExecutor().also { analysisExecutor = it }
+            val executor = analysisExecutor ?: Executors.newSingleThreadExecutor().also { analysisExecutor = it }
+            quality = CameraSettings.quality(this)
 
             val analysis = ImageAnalysis.Builder()
-                .setTargetResolution(Size(640, 480))
+                .setTargetResolution(quality.resolution)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
                 .also { it.setAnalyzer(executor) { image -> onFrame(image) } }
 
+            // Também libera a prévia do app, se estiver aberta: a câmera só pode ter um dono.
             provider.unbindAll()
-            val camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, analysis)
+            val lens = CameraSettings.lens(this).selector
+            val available = runCatching { provider.hasCamera(lens) }.getOrDefault(false)
+            val selector = if (available) lens else CameraSelector.DEFAULT_BACK_CAMERA
+            val camera = provider.bindToLifecycle(this, selector, analysis)
             // Erro grave (ex.: câmera bloqueada pelo sistema por ter sido aberta em segundo plano).
+            cameraState?.removeObservers(this)
+            cameraState = camera.cameraInfo.cameraState
             camera.cameraInfo.cameraState.observe(this) { state ->
                 if (state.error?.type == CameraState.ErrorType.CRITICAL) {
                     Log.w(TAG, "Câmera indisponível: código ${state.error?.code}")
@@ -194,7 +213,8 @@ class StreamService : LifecycleService() {
         try {
             val now = System.currentTimeMillis()
             // Sem visualizador, não gasta CPU nem dados convertendo quadros.
-            if (!RelayClient.streaming || now - lastFrameAt < frameIntervalMs) return
+            val interval = maxOf(quality.frameIntervalMs, thermalIntervalMs)
+            if (!RelayClient.streaming || now - lastFrameAt < interval) return
             lastFrameAt = now
             relay.sendFrame(image.toJpeg())
         } catch (e: Exception) {
@@ -219,7 +239,7 @@ class StreamService : LifecycleService() {
         val frame = Bitmap.createBitmap(raw, 0, 0, width, height, matrix, true)
 
         val out = ByteArrayOutputStream()
-        frame.compress(Bitmap.CompressFormat.JPEG, jpegQuality, out)
+        frame.compress(Bitmap.CompressFormat.JPEG, minOf(quality.jpegQuality, thermalJpegQuality), out)
         return out.toByteArray()
     }
 
@@ -249,14 +269,14 @@ class StreamService : LifecycleService() {
 
     // Celular quente: menos quadros e JPEG menor, para gerar menos calor. Volta ao normal ao esfriar.
     private fun applyThermalLimits(temperature: Double?) {
-        val (interval, quality) = when {
-            temperature == null || temperature < WARM_CELSIUS -> NORMAL_FRAME_INTERVAL_MS to NORMAL_JPEG_QUALITY
+        val (interval, jpeg) = when {
+            temperature == null || temperature < WARM_CELSIUS -> 0L to 100
             temperature < HOT_CELSIUS -> WARM_FRAME_INTERVAL_MS to WARM_JPEG_QUALITY
             else -> HOT_FRAME_INTERVAL_MS to HOT_JPEG_QUALITY
         }
-        frameIntervalMs = interval
-        jpegQuality = quality
-        isThrottled = interval != NORMAL_FRAME_INTERVAL_MS
+        thermalIntervalMs = interval
+        thermalJpegQuality = jpeg
+        isThrottled = interval > 0
     }
 
     private fun updateNotification() {
@@ -312,13 +332,11 @@ class StreamService : LifecycleService() {
         private const val KEY_SHOULD_RUN = "shouldRun"
         private const val HEALTH_INTERVAL_MS = 60_000L
 
-        // Qualidade por faixa de temperatura da bateria.
+        // Limites por faixa de temperatura da bateria (somam-se à qualidade escolhida).
         private const val WARM_CELSIUS = 40.0
         private const val HOT_CELSIUS = 44.0
-        private const val NORMAL_FRAME_INTERVAL_MS = 100L // ~10 fps, para caber bem no LTE
         private const val WARM_FRAME_INTERVAL_MS = 250L // ~4 fps
         private const val HOT_FRAME_INTERVAL_MS = 1_000L // 1 fps
-        private const val NORMAL_JPEG_QUALITY = 60
         private const val WARM_JPEG_QUALITY = 50
         private const val HOT_JPEG_QUALITY = 40
 
