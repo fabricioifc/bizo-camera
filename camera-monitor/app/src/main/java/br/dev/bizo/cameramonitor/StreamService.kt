@@ -16,6 +16,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.util.Base64
 import android.util.Log
+import android.view.OrientationEventListener
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
@@ -51,8 +52,26 @@ class StreamService : LifecycleService() {
     private var cameraState: LiveData<CameraState>? = null
     private var camera: Camera? = null
 
-    // Rotação extra escolhida pelo usuário (celular de lado), aplicada a cada quadro enviado.
+    // Rotação extra escolhida pelo usuário (ajuste fino), aplicada a cada quadro enviado.
     @Volatile private var rotation = Rotation.R0
+
+    // Posição do celular (em pé, deitado...), lida pelo sensor: a imagem enviada sai sempre
+    // "em pé", como na prévia do app, mesmo com o celular preso de lado.
+    private var analysis: ImageAnalysis? = null
+    private var deviceRotation = DeviceOrientation.ROTATION_0
+    @Volatile private var resetMotion = false
+    private val orientationListener by lazy {
+        object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                val next = DeviceOrientation.rotationFor(orientation, deviceRotation)
+                if (next == deviceRotation) return
+                deviceRotation = next
+                analysis?.targetRotation = next
+                // Enquadramento novo: a comparação de movimento recomeça do zero (na thread dos quadros).
+                resetMotion = true
+            }
+        }
+    }
 
     // Detecção de movimento (roda na thread de análise dos quadros).
     private val motionDetector = MotionDetector()
@@ -154,6 +173,7 @@ class StreamService : LifecycleService() {
             cameraStarted = true
             acquireLocks()
             relay.start()
+            if (orientationListener.canDetectOrientation()) orientationListener.enable()
             startCamera()
             healthTicker.run()
             handler.postDelayed(updateTicker, UPDATE_FIRST_CHECK_MS)
@@ -168,6 +188,8 @@ class StreamService : LifecycleService() {
         isThrottled = false
         cameraStarted = false
         handler.removeCallbacks(healthTicker)
+        orientationListener.disable()
+        analysis = null
         handler.removeCallbacks(updateTicker)
         RelayClient.configureHandler = null
         camera = null
@@ -230,6 +252,7 @@ class StreamService : LifecycleService() {
 
             val analysis = ImageAnalysis.Builder()
                 .setTargetResolution(quality.resolution)
+                .setTargetRotation(deviceRotation)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
@@ -242,6 +265,7 @@ class StreamService : LifecycleService() {
             val selector = if (available) lens else CameraSelector.DEFAULT_BACK_CAMERA
             val camera = provider.bindToLifecycle(this, selector, analysis)
             this.camera = camera
+            this.analysis = analysis
             // Câmera ou enquadramento novos: a próxima comparação de movimento recomeça do zero.
             motionDetector.reset()
             // A lanterna apaga ao trocar de câmera; acende de novo se estiver pedida.
@@ -263,6 +287,10 @@ class StreamService : LifecycleService() {
     private fun onFrame(image: ImageProxy) {
         try {
             val now = System.currentTimeMillis()
+            if (resetMotion) {
+                resetMotion = false
+                motionDetector.reset()
+            }
             // Movimento: confere duas vezes por segundo, mesmo sem ninguém assistindo.
             if (motionEnabled && RelayClient.connected && now - lastMotionCheckAt >= MOTION_CHECK_MS) {
                 lastMotionCheckAt = now

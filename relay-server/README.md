@@ -234,7 +234,7 @@ Os celulares com o app procuram versão nova ao abrir o app, ao abrir a aba Ajus
 
 A tela de uma câmera tem duas abas: **Ao vivo** (imagem e controles) e **Movimentos** (fotos dos últimos movimentos, com um contador dos que chegaram enquanto a aba estava fechada). Na aba Ao vivo, o cartão **Controles** muda, sem tocar no celular:
 
-- câmera (traseira ou frontal), rotação (−90°, 0°, 90° ou 180°, para o celular preso de lado ou de cabeça para baixo) e qualidade;
+- câmera (traseira ou frontal), rotação extra (−90°, 0°, 90° ou 180°) e qualidade. A imagem já sai na posição do celular (em pé ou deitado), lida pelo sensor; a rotação extra é só para casos em que o sensor não ajuda, como o celular deitado de costas ou preso no teto;
 - lanterna (só em lentes com flash; a frontal normalmente não tem);
 - detecção de movimento e sensibilidade.
 

@@ -63,7 +63,7 @@
     <string name="rotation_180">180°</string>
     <!-- 270° aparece como −90° (girar para a esquerda), igual ao site. -->
     <string name="rotation_270">−90°</string>
-    <string name="rotation_hint">Gira a imagem enviada ao site e as fotos de movimento. Use se o celular estiver preso de lado ou de cabeça para baixo.</string>
+    <string name="rotation_hint">A imagem já acompanha a posição do celular (em pé ou deitado). Use só se ainda sair torta, por exemplo com o celular deitado de costas ou preso no teto.</string>
     <string name="torch_switch">Lanterna</string>
     <string name="torch_hint">Acende a luz do celular enquanto a câmera transmite. Só na câmera traseira.</string>
     <string name="sensitivity_low_hint">Só movimentos grandes, como uma pessoa passando perto.</string>

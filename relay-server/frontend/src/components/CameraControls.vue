@@ -79,7 +79,7 @@ function set(key, value) {
               @click="set('rotation', option.value)"
             >{{ option.label }}</button>
           </div>
-          <span class="control-hint">Para o celular preso de lado ou de cabeça para baixo.</span>
+          <span class="control-hint">A imagem já acompanha a posição do celular. Use só se ainda sair torta.</span>
         </div>
 
         <div class="control">
