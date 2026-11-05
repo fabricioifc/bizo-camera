@@ -1,3 +1,4 @@
+# Só para desenvolvimento: servidor do Vite com recarga automática na porta 5173.
 FROM node:20-alpine
 
 WORKDIR /app
@@ -5,11 +6,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY frontend ./frontend
-COPY web ./web
-COPY vite.config.js ./
+COPY . .
 
 ENV VITE_HOST=0.0.0.0
 EXPOSE 5173
 
-CMD ["npm", "run", "dev:web"]
+CMD ["npm", "run", "dev"]

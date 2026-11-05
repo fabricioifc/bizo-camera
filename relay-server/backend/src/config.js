@@ -6,7 +6,7 @@ const path = require('node:path');
 function loadConfig(env = process.env) {
   const port = Number(env.PORT || 8787);
   const publicUrl = (env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/+$/, '');
-  const dataFile = env.DATA_FILE || path.join(__dirname, '..', 'data', 'db.json');
+  const dataFile = env.DATA_FILE || path.join(__dirname, '..', '..', 'data', 'db.json');
   const dataDir = path.dirname(dataFile);
   const googleClientId = env.GOOGLE_CLIENT_ID || '';
   const googleClientSecret = env.GOOGLE_CLIENT_SECRET || '';
@@ -28,7 +28,8 @@ function loadConfig(env = process.env) {
     dataFile,
     dataDir,
     snapshotDir: path.join(dataDir, 'snapshots'),
-    webDir: path.join(__dirname, '..', 'web'),
+    // Página compilada pelo frontend (npm run build em frontend/).
+    webDir: env.WEB_DIR || path.join(__dirname, '..', '..', 'frontend', 'dist'),
   };
 }
 

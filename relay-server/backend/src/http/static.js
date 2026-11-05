@@ -3,9 +3,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-// Arquivos fixos da página. O resto vem do build do Vue em web/dist/assets.
+// Arquivos fixos da página. Tudo vem do build do frontend (frontend/dist).
 const STATIC_FILES = new Map([
-  ['/', { file: path.join('dist', 'index.html'), type: 'text/html; charset=utf-8' }],
+  ['/', { file: 'index.html', type: 'text/html; charset=utf-8' }],
   ['/sw.js', { file: 'sw.js', type: 'text/javascript; charset=utf-8' }],
   ['/favicon.ico', { file: 'favicon.ico', type: 'image/x-icon' }],
   ['/icon-192.png', { file: 'icon-192.png', type: 'image/png' }],
@@ -26,7 +26,7 @@ function resolve(pathname) {
   const asset = pathname.match(/^\/assets\/([a-zA-Z0-9._-]+)$/);
   if (!asset) return null;
   return {
-    file: path.join('dist', 'assets', asset[1]),
+    file: path.join('assets', asset[1]),
     type: asset[1].endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8',
     immutable: true,
   };

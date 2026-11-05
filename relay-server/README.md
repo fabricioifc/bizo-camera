@@ -2,9 +2,17 @@
 
 Liga a câmera (app Android) aos visualizadores (navegador). Também entrega o site de visualização em `/`.
 
+| Pasta | O que é |
+|---|---|
+| `backend/` | Servidor Node: API, WebSockets da câmera e dos visualizadores, e a página já compilada. Porta **8787**. |
+| `frontend/` | Página em Vue 3 + Vite. Em produção vira arquivos estáticos (`frontend/dist`) servidos pelo backend. |
+| `scripts/` | Backup e restauração do volume de dados, usados pelo Docker. |
+
+**Portas.** Em produção só existe a **8787**: o backend serve a página, a API e a câmera. A **5173** é o servidor do Vite e só existe em desenvolvimento, para recarregar a página a cada alteração; ele encaminha a API e os WebSockets para a 8787. Por isso, em desenvolvimento, as duas ficam no ar: abra a página na 5173 e aponte o app Android para a 8787. A página que a 8787 mostra em desenvolvimento é a compilada quando a imagem foi construída, então pode estar desatualizada.
+
 ## Rodar com Docker
 
-Requer Docker Desktop (ou Docker Engine + Compose). A interface web usa Vue 3 e Vite; os arquivos compilados são servidos pelo relay.
+Requer Docker Desktop (ou Docker Engine + Compose). O `Dockerfile` compila o frontend e gera uma imagem só com o backend e a página pronta.
 
 Configure as variáveis de ambiente antes de iniciar pela primeira vez:
 
@@ -37,7 +45,7 @@ Suba o relay e o frontend juntos:
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-Abra `http://localhost:5173` para usar o frontend Vue. O relay e a conexão da câmera continuam na porta `8787`; use `http://IP_DO_COMPUTADOR:8787` no app Android debug. Alterações nos arquivos em `frontend/` são refletidas pelo Vite sem rebuild.
+Abra `http://localhost:5173` para usar a página. O backend e a conexão da câmera continuam na porta `8787`; use `http://IP_DO_COMPUTADOR:8787` no app Android debug. Alterações em `frontend/` aparecem na hora, sem rebuild. Alterações em `backend/` precisam de `docker compose -f docker-compose.dev.yml up -d --build relay`.
 
 Para conectar o celular na mesma rede Wi-Fi:
 
@@ -61,17 +69,17 @@ Para apagar os dados junto com o volume, use `docker compose down -v`. Isso remo
 
 `GET /healthz` responde `{ "ok": true }` enquanto o servidor atende. O Dockerfile usa essa rota no `HEALTHCHECK`, a cada 30 segundos, e `docker ps` mostra `healthy` ou `unhealthy`. O Docker sozinho só reinicia o container quando o processo cai (`restart: unless-stopped`); um container que ficar `unhealthy` sem cair precisa de `docker compose restart relay`.
 
-### Desenvolvimento da interface Vue
+### Desenvolvimento do frontend sem Docker
 
-Se preferir executar o Vite fora do Docker, com o relay em execução pela configuração dev, instale as dependências e inicie-o:
+Com o backend rodando na 8787 (pelo Compose de desenvolvimento ou com `npm start` em `backend/`):
 
 ```bash
-cd relay-server
+cd relay-server/frontend
 npm install
-npm run dev:web
+npm run dev
 ```
 
-Abra `http://localhost:5173` no navegador para usar o site e fazer login. O Vite encaminha API, callback OAuth e WebSockets para o relay em `8787`. Para conectar a câmera Android debug, use `http://IP_DO_COMPUTADOR:8787`. Para publicação, o Docker compila a interface com `npm run build:web` e serve os assets produzidos pelo Node.
+Abra `http://localhost:5173`. O Vite encaminha a API, o retorno do login com Google e os WebSockets para a 8787.
 
 ### Backup
 
@@ -101,15 +109,15 @@ Sem o nome do arquivo, `docker compose run --rm restore` só lista as cópias di
 
 ## Testes
 
-Roda os testes de `tests/` com o executor do próprio Node (`node --test`). Cada arquivo sobe o servidor de verdade numa porta livre, com um banco temporário: login e sessões, 2FA, login com Google (com chave falsa), saúde, movimento e gerenciamento das câmeras, permissões das fotos, alertas e arquivos da página.
+Os testes ficam em `backend/tests/` e usam o executor do próprio Node (`node --test`). Cada arquivo sobe o servidor de verdade numa porta livre, com um banco temporário: login e sessões, 2FA, login com Google (com chave falsa), saúde, movimento e gerenciamento das câmeras, permissões das fotos, alertas e arquivos da página. Antes, o `npm test` compila o frontend, porque um dos testes confere a página servida.
 
 Num container, sem precisar de Node instalado (PowerShell ou Git Bash, na pasta `relay-server`):
 
 ```bash
-docker run --rm -v "${PWD}:/app" -v /app/node_modules -w /app node:20-alpine sh -c "npm ci && npm test"
+docker run --rm -v "${PWD}:/app" -v /app/backend/node_modules -v /app/frontend/node_modules -w /app node:20-alpine sh -c "cd frontend && npm ci && cd ../backend && npm ci && npm test"
 ```
 
-Com Node instalado, basta `npm test`.
+Com Node instalado: `npm install` em `frontend/` e em `backend/`, depois `npm test` em `backend/`.
 
 ### Expor pelo cloudflared
 
@@ -129,24 +137,36 @@ A primeira conta pode ser criada sem configuração extra. Depois que existir um
 ## Organização do código
 
 ```
-src/
-  server.js      ponto de entrada: lê a configuração e abre a porta
-  config.js      variáveis de ambiente
-  app.js         monta banco, serviços, rotas e WebSockets
-  websocket.js   /ws/device (câmera) e /ws/view (visualizador)
-  http/          resposta JSON, roteador, limite de tentativas, arquivos da página
-  routes/        rotas da API: auth, account (2FA), devices, push, e as verificações de sessão (guards)
-  services/      regras: sessões, contas, desafio do 2FA, câmeras e movimentos, alertas, conexões ao vivo (hub)
-  lib/           peças sem regra de negócio: banco JSON, TOTP, Google OIDC, Web Push, hashes
-frontend/        página em Vue (views, components, lib); o build vai para web/dist
+backend/
+  src/
+    server.js      ponto de entrada: lê a configuração e abre a porta
+    config.js      variáveis de ambiente
+    app.js         monta banco, serviços, rotas e WebSockets
+    websocket.js   /ws/device (câmera) e /ws/view (visualizador)
+    http/          resposta JSON, roteador, limite de tentativas, arquivos da página
+    routes/        rotas da API: auth, account (2FA), devices, push, e as verificações de sessão (guards)
+    services/      regras: sessões, contas, desafio do 2FA, câmeras e movimentos, alertas, conexões ao vivo (hub)
+    lib/           peças sem regra de negócio: banco JSON, TOTP, Google OIDC, Web Push, hashes
+  tests/
+frontend/
+  index.html
+  public/          service worker e ícones, copiados como estão para dist/
+  src/
+    App.vue        navegação entre as telas
+    views/         telas: login, código 2FA, segurança, lista de câmeras, câmera ao vivo
+    components/    partes das telas
+    lib/           chamadas à API, formatação, Web Push
+  vite.config.js
 ```
 
 ## Rodar sem Docker
 
 ```bash
-cd relay-server
+cd relay-server/frontend
 npm install
-npm run build:web
+npm run build
+cd ../backend
+npm install
 npm start
 ```
 
@@ -158,12 +178,13 @@ Abra http://localhost:8787 no navegador.
 |---|---|---|
 | `PORT` | `8787` | Porta HTTP. |
 | `PUBLIC_URL` | `http://localhost:8787` | Endereço público do site. Usado no retorno do login com Google. Com `https://`, o cookie de sessão vira `Secure`. |
-| `DATA_FILE` | `data/db.json` | Arquivo onde ficam usuários, câmeras e sessões. No Docker, é `/data/db.json`. |
+| `DATA_FILE` | `relay-server/data/db.json` | Arquivo onde ficam usuários, câmeras e sessões. No Docker, é `/data/db.json`. |
 | `ALLOW_SIGNUP` | (vazio) | Defina `1` para permitir novos cadastros além do primeiro usuário. |
 | `TRUST_PROXY` | (vazio) | Defina `1` atrás de um proxy ou túnel (cloudflared, Caddy, Nginx), para limitar tentativas por IP real. |
 | `REQUIRE_2FA` | `1` | Exige verificação em duas etapas no login e antes do acesso às câmeras. No Compose de desenvolvimento fica desativado. |
 | `GOOGLE_CLIENT_ID` | (vazio) | Cliente OAuth do Google. Sem ele, o botão de login com Google fica desativado. |
 | `GOOGLE_CLIENT_SECRET` | (vazio) | Segredo do cliente OAuth. Nunca versione este valor. |
+| `WEB_DIR` | `relay-server/frontend/dist` | Pasta da página compilada servida pelo backend. |
 | `BACKUP_SCHEDULE` | `0 6 * * *` | Horário diário do backup em UTC, no formato cron. |
 | `BACKUP_KEEP` | `14` | Quantidade de backups a manter. |
 

@@ -1,5 +1,6 @@
 node_modules/
-web/dist/
+# Build do frontend (gerado por npm run build e pelo Docker).
+frontend/dist/
 # Banco local com contas e hashes: nunca versionar.
 data/
 # Cópias do volume de dados (contas, fotos, chaves): ficam só nesta máquina.
