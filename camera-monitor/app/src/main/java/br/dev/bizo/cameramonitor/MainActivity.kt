@@ -135,7 +135,8 @@ class MainActivity : AppCompatActivity() {
                     ContextCompat.startForegroundService(this, Intent(this, StreamService::class.java))
                     binding.root.postDelayed({ refresh() }, 800)
                 } else {
-                    statusNotice = getString(R.string.register_error)
+                    val detail = relay.lastError?.takeIf { BuildConfig.DEBUG }?.let { "\n($it)" }.orEmpty()
+                    statusNotice = getString(R.string.register_error) + detail
                     refresh()
                 }
             }

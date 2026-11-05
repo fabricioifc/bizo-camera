@@ -11,6 +11,7 @@ Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadro
 3. O Client ID do Google (cliente **Aplicativo da Web**, o mesmo `GOOGLE_CLIENT_ID` do servidor) já está em `gradle.properties` como `googleServerClientId`. Para outro valor, use `-PgoogleServerClientId=...` na linha de comando.
 4. No Google Cloud, crie um cliente OAuth do tipo **Android** com o nome do pacote `br.dev.bizo.cameramonitor` e o SHA-1 da keystore de release. Sem ele, o seletor de conta não abre. Para usar o build debug em paralelo, crie outro cliente Android com o pacote `br.dev.bizo.cameramonitor.debug` e o SHA-1 da chave de debug do Android.
 5. Conecte o celular com depuração USB e clique em Run. O build debug tem o sufixo `.debug` no identificador do app e pode ficar instalado ao lado do release. Como são instalações separadas, configure novamente o endereço local do relay no app debug.
+6. Ao trocar de servidor, o app apaga a sessão e o registro da câmera do servidor anterior; entre com o Google novamente no novo servidor.
 
 ## Testes
 

@@ -54,11 +54,14 @@ object ServerDialog {
                     }
                     val changed = url != ServerSettings.url(activity)
                     ServerSettings.setUrl(activity, url)
+                    if (changed) {
+                        if (StreamService.isRunning) {
+                            activity.startService(Intent(activity, StreamService::class.java).setAction(StreamService.ACTION_STOP))
+                        }
+                        relay.resetForServerChange()
+                    }
                     dialog.dismiss()
                     if (!changed) return@runOnUiThread
-                    if (StreamService.isRunning) {
-                        activity.startService(Intent(activity, StreamService::class.java).setAction(StreamService.ACTION_RECONNECT))
-                    }
                     onSaved()
                 }
             }

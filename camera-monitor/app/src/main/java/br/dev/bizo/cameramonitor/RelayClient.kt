@@ -114,13 +114,38 @@ class RelayClient(context: Context) {
         prefs.edit().remove(KEY_SESSION).apply()
     }
 
+    /** A sessão e as credenciais da câmera pertencem ao relay anterior. */
+    fun resetForServerChange() {
+        clearAccountCredentials()
+        setupToken = null
+        setupEmail = null
+        socket?.cancel()
+        socket = null
+        stopped = true
+        setState(isConnected = false, isStreaming = false)
+    }
+
+    private fun clearAccountCredentials() {
+        prefs.edit()
+            .remove(KEY_SESSION)
+            .remove(KEY_EMAIL)
+            .remove(KEY_OWNER)
+            .remove(KEY_ID)
+            .remove(KEY_SECRET)
+            .apply()
+    }
+
     /** Registra este aparelho na conta, se ainda não estiver registrado. */
     @Synchronized
     fun registerDevice(): Boolean {
         if (isRegistered) return true
         val session = prefs.getString(KEY_SESSION, null) ?: return false
         val body = JSONObject().put("name", Build.MODEL).toString()
-        val registration = post("/api/devices/register", body, session) ?: return false
+        val registration = post("/api/devices/register", body, session)
+        if (registration == null) {
+            if (lastError?.startsWith("HTTP 401 ") == true) clearAccountCredentials()
+            return false
+        }
         prefs.edit()
             .putString(KEY_ID, registration.getString("deviceId"))
             .putString(KEY_SECRET, registration.getString("deviceSecret"))
