@@ -20,6 +20,19 @@
     <string name="status_live_title">Ao vivo</string>
     <string name="status_live_detail">Transmitindo para quem está assistindo.</string>
     <string name="account_label">Conta: %1$s</string>
+    <string name="status_uptime">Conectada há %1$s</string>
+    <plurals name="status_drops">
+        <item quantity="one">%d queda de conexão</item>
+        <item quantity="other">%d quedas de conexão</item>
+    </plurals>
+    <string name="duration_less_than_minute">menos de 1 min</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="duration_hours">%1$d h %2$d min</string>
+
+    <!-- Economia de bateria -->
+    <string name="battery_title">Deixe a câmera funcionar em segundo plano</string>
+    <string name="battery_detail">Com a economia de bateria ativa, o Android pode encerrar a transmissão com a tela apagada.</string>
+    <string name="battery_button">Permitir</string>
 
     <!-- Login -->
     <string name="login_title">Entrar</string>
@@ -46,6 +59,10 @@
     <!-- Notificação -->
     <string name="notif_channel">Transmissão da câmera</string>
     <string name="notif_title">Câmera ativa</string>
-    <string name="notif_text">Conectada ao servidor</string>
+    <string name="notif_connecting">Conectando ao servidor…</string>
+    <string name="notif_ready">Pronta, aguardando alguém assistir</string>
+    <string name="notif_live">Ao vivo</string>
     <string name="notif_stop">Parar</string>
+    <string name="notif_resume_title">Câmera pausada</string>
+    <string name="notif_resume_text">Toque para voltar a transmitir.</string>
 </resources>

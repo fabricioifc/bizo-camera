@@ -11,6 +11,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
+import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -127,6 +128,7 @@ class RelayClient(context: Context) {
 
     fun start() {
         stopped = false
+        drops = 0
         io.execute { attempt() }
     }
 
@@ -225,9 +227,13 @@ class RelayClient(context: Context) {
     }
 
     private fun setState(isConnected: Boolean, isStreaming: Boolean) {
+        if (isConnected && !connected) connectedSince = System.currentTimeMillis()
+        // Queda: estava conectada e perdeu a conexão sem o usuário ter parado a câmera.
+        if (!isConnected && connected && !stopped) drops++
+        if (!isConnected) connectedSince = 0L
         connected = isConnected
         streaming = isStreaming
-        onChange?.invoke()
+        for (listener in listeners) listener()
     }
 
     companion object {
@@ -248,8 +254,25 @@ class RelayClient(context: Context) {
         var streaming = false
             private set
 
-        /** Chamado sempre que a conexão ou o pedido de transmissão muda. */
+        /** Momento em que a conexão atual começou (0 se desconectada). */
         @Volatile
-        var onChange: (() -> Unit)? = null
+        var connectedSince = 0L
+            private set
+
+        /** Quedas de conexão desde que a câmera foi iniciada. */
+        @Volatile
+        var drops = 0
+            private set
+
+        private val listeners = CopyOnWriteArraySet<() -> Unit>()
+
+        /** Ouvintes chamados sempre que a conexão ou o pedido de transmissão muda (em qualquer thread). */
+        fun addListener(listener: () -> Unit) {
+            listeners.add(listener)
+        }
+
+        fun removeListener(listener: () -> Unit) {
+            listeners.remove(listener)
+        }
     }
 }

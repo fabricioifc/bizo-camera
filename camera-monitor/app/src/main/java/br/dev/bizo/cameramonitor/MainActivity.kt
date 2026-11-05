@@ -1,12 +1,17 @@
 package br.dev.bizo.cameramonitor
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Base64
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -38,6 +43,16 @@ class MainActivity : AppCompatActivity() {
 
     // Aviso temporário no cartão de status (ex.: permissão negada); some no próximo refresh de estado.
     private var statusNotice: String? = null
+
+    private val relayListener: () -> Unit = { runOnUiThread { refresh() } }
+
+    // Atualiza o tempo de conexão na tela enquanto o app está aberto.
+    private val ticker = object : Runnable {
+        override fun run() {
+            refresh()
+            binding.root.postDelayed(this, TICK_MS)
+        }
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -73,17 +88,23 @@ class MainActivity : AppCompatActivity() {
             showStep(Step.SIGN_IN)
             refresh()
         }
+        binding.batteryButton.setOnClickListener { requestBatteryExemption() }
         showStep(Step.SIGN_IN)
     }
 
     override fun onResume() {
         super.onResume()
-        RelayClient.onChange = { runOnUiThread { refresh() } }
-        refresh()
+        RelayClient.addListener(relayListener)
+        // A câmera estava ligada (ex.: pausada após reiniciar o celular): abrir o app retoma a transmissão.
+        if (StreamService.shouldRun(this) && !StreamService.isRunning && relay.isSignedIn && hasCameraPermission()) {
+            startStreaming()
+        }
+        ticker.run()
     }
 
     override fun onPause() {
-        RelayClient.onChange = null
+        RelayClient.removeListener(relayListener)
+        binding.root.removeCallbacks(ticker)
         super.onPause()
     }
 
@@ -314,7 +335,15 @@ class MainActivity : AppCompatActivity() {
         }
         binding.statusDot.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, color))
         binding.statusTitle.setText(title)
-        binding.statusDetail.text = statusNotice ?: getString(detail)
+        val connection = buildList {
+            val since = RelayClient.connectedSince
+            if (running && since > 0) add(getString(R.string.status_uptime, formatDuration(System.currentTimeMillis() - since)))
+            val drops = RelayClient.drops
+            if (running && drops > 0) add(resources.getQuantityString(R.plurals.status_drops, drops, drops))
+        }.joinToString(" · ")
+        binding.statusDetail.text = statusNotice ?: listOf(getString(detail), connection).filter { it.isNotEmpty() }.joinToString("\n")
+
+        binding.batteryCard.visibility = visibleIf(signedIn && !isIgnoringBatteryOptimizations())
 
         binding.accountText.text = relay.email?.let { getString(R.string.account_label, it) }
         binding.accountText.visibility = visibleIf(signedIn && relay.email != null)
@@ -331,9 +360,36 @@ class MainActivity : AppCompatActivity() {
         binding.signOutButton.visibility = visibleIf(signedIn && !running)
     }
 
+    private fun formatDuration(ms: Long): String {
+        val minutes = ms / 60_000
+        return when {
+            minutes < 1 -> getString(R.string.duration_less_than_minute)
+            minutes < 60 -> getString(R.string.duration_minutes, minutes.toInt())
+            else -> getString(R.string.duration_hours, (minutes / 60).toInt(), (minutes % 60).toInt())
+        }
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean =
+        getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+
+    // Abre o pedido do Android para tirar o app da otimização de bateria.
+    @SuppressLint("BatteryLife")
+    private fun requestBatteryExemption() {
+        val request = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
+        try {
+            startActivity(request)
+        } catch (e: ActivityNotFoundException) {
+            runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+        }
+    }
+
     private fun visibleIf(condition: Boolean) = if (condition) View.VISIBLE else View.GONE
 
     private fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
+
+    companion object {
+        private const val TICK_MS = 30_000L
+    }
 }
