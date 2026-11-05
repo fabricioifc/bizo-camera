@@ -23,6 +23,42 @@ docker compose down              # parar (mantém os dados)
 
 Para apagar os dados junto com o volume, use `docker compose down -v`. Isso remove todas as contas.
 
+### Saúde do servidor
+
+`GET /healthz` responde `{ "ok": true }` enquanto o servidor atende. O Dockerfile usa essa rota no `HEALTHCHECK`, a cada 30 segundos, e `docker ps` mostra `healthy` ou `unhealthy`. O Docker sozinho só reinicia o container quando o processo cai (`restart: unless-stopped`); um container que ficar `unhealthy` sem cair precisa de `docker compose restart relay`.
+
+### Backup
+
+O volume tem tudo o que não dá para recriar: contas, sessões, câmeras, fotos de movimento e as chaves dos alertas (`vapid.json`). Para copiar, rode na máquina onde o servidor roda:
+
+```bash
+npm run backup
+```
+
+A cópia vai para `relay-server/backups/relay-data-<data>.tar.gz` (fora do git). O script guarda as 14 mais recentes (`npm run backup -- --keep 30` para mudar). Pode rodar com o servidor ligado. Leve as cópias para fora do computador de vez em quando (pendrive ou nuvem privada).
+
+Para fazer backup todo dia no Windows, crie uma tarefa agendada (ajuste o caminho se o projeto estiver em outro lugar):
+
+```bash
+schtasks /create /tn "Backup Monitor de Camera" /sc daily /st 03:00 /tr "cmd /c cd /d C:\Users\fabri\OneDrive\Documents\projetos\bizo-camera\relay-server && npm run backup"
+```
+
+Para restaurar (apaga os dados atuais do volume):
+
+```bash
+docker compose stop relay
+npm run restore -- backups/relay-data-<data>.tar.gz --yes
+docker compose up -d
+```
+
+## Testes
+
+```bash
+npm test
+```
+
+Roda os testes de `tests/` com o executor do próprio Node (`node --test`). Cada arquivo sobe o servidor de verdade numa porta livre, com um banco temporário: login e sessões, 2FA, login com Google (com chave falsa), saúde e movimento das câmeras, permissões das fotos, alertas e arquivos da página.
+
 ### Expor pelo cloudflared
 
 O túnel roda no host e aponta para `http://localhost:8787`. Com o container ativo, o `config.yml` do túnel continua igual ao passo a passo:

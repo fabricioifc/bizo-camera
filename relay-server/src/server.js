@@ -718,7 +718,10 @@ function serveStatic(pathname, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
-    if (url.pathname === '/api/auth/google/start' || url.pathname === '/api/auth/google/callback') {
+    if (url.pathname === '/healthz') {
+      // Usado pelo healthcheck do Docker: responde se o processo está atendendo requisições.
+      sendJson(res, 200, { ok: true, cameras: deviceSockets.size });
+    } else if (url.pathname === '/api/auth/google/start' || url.pathname === '/api/auth/google/callback') {
       handleGoogle(req, res, url);
     } else if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);

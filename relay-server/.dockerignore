@@ -1,5 +1,8 @@
 node_modules
 data
+backups
+tests
+scripts
 .git
 .gitignore
 *.log

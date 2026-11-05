@@ -1,5 +1,7 @@
 node_modules/
 # Banco local com contas e hashes: nunca versionar.
 data/
+# Cópias do volume de dados (contas, fotos, chaves): ficam só nesta máquina.
+backups/
 .env
 *.log

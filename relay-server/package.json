@@ -5,7 +5,10 @@
   "description": "Servidor que liga a câmera (celular) aos visualizadores pela internet",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test",
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js"
   },
   "engines": {
     "node": ">=18"
