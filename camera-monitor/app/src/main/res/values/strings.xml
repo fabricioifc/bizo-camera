@@ -21,6 +21,7 @@
     <string name="status_live_detail">Transmitindo para quem está assistindo.</string>
     <string name="account_label">Conta: %1$s</string>
     <string name="status_uptime">Conectada há %1$s</string>
+    <string name="status_hot">celular quente, qualidade reduzida</string>
     <plurals name="status_drops">
         <item quantity="one">%d queda de conexão</item>
         <item quantity="other">%d quedas de conexão</item>

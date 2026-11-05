@@ -6,12 +6,16 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import android.util.Size
@@ -23,6 +27,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -39,9 +44,27 @@ class StreamService : LifecycleService() {
     private var lastFrameAt = 0L
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var wasConnected = false
 
-    // Atualiza a notificação quando a conexão ou o pedido de transmissão mudam.
-    private val relayListener: () -> Unit = { updateNotification() }
+    // Intervalo entre quadros e qualidade do JPEG; mudam quando o celular esquenta.
+    @Volatile private var frameIntervalMs = NORMAL_FRAME_INTERVAL_MS
+    @Volatile private var jpegQuality = NORMAL_JPEG_QUALITY
+
+    // Atualiza a notificação quando a conexão muda e envia a saúde logo após conectar.
+    private val relayListener: () -> Unit = {
+        val connected = RelayClient.connected
+        if (connected && !wasConnected) handler.post { reportHealth() }
+        wasConnected = connected
+        updateNotification()
+    }
+
+    private val healthTicker = object : Runnable {
+        override fun run() {
+            reportHealth()
+            handler.postDelayed(this, HEALTH_INTERVAL_MS)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -82,6 +105,7 @@ class StreamService : LifecycleService() {
             acquireLocks()
             relay.start()
             startCamera()
+            healthTicker.run()
         }
         return START_STICKY
     }
@@ -90,7 +114,9 @@ class StreamService : LifecycleService() {
 
     override fun onDestroy() {
         isRunning = false
+        isThrottled = false
         cameraStarted = false
+        handler.removeCallbacks(healthTicker)
         RelayClient.removeListener(relayListener)
         relay.stop()
         releaseLocks()
@@ -168,7 +194,7 @@ class StreamService : LifecycleService() {
         try {
             val now = System.currentTimeMillis()
             // Sem visualizador, não gasta CPU nem dados convertendo quadros.
-            if (!RelayClient.streaming || now - lastFrameAt < MIN_FRAME_INTERVAL_MS) return
+            if (!RelayClient.streaming || now - lastFrameAt < frameIntervalMs) return
             lastFrameAt = now
             relay.sendFrame(image.toJpeg())
         } catch (e: Exception) {
@@ -193,8 +219,44 @@ class StreamService : LifecycleService() {
         val frame = Bitmap.createBitmap(raw, 0, 0, width, height, matrix, true)
 
         val out = ByteArrayOutputStream()
-        frame.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+        frame.compress(Bitmap.CompressFormat.JPEG, jpegQuality, out)
         return out.toByteArray()
+    }
+
+    // Lê bateria e temperatura, ajusta a qualidade conforme o calor e avisa o servidor.
+    private fun reportHealth() {
+        val battery = ContextCompat.registerReceiver(
+            this, null, IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED
+        ) ?: return
+        val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        val status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        // A temperatura vem em décimos de grau Celsius.
+        val temperature = battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
+            .takeIf { it != Int.MIN_VALUE }?.div(10.0)
+
+        applyThermalLimits(temperature)
+        if (!RelayClient.connected) return
+        val message = JSONObject()
+            .put("type", "health")
+            .put("charging", charging)
+            .put("throttled", isThrottled)
+        if (level >= 0 && scale > 0) message.put("battery", level * 100 / scale)
+        if (temperature != null) message.put("temperature", temperature)
+        relay.sendMessage(message)
+    }
+
+    // Celular quente: menos quadros e JPEG menor, para gerar menos calor. Volta ao normal ao esfriar.
+    private fun applyThermalLimits(temperature: Double?) {
+        val (interval, quality) = when {
+            temperature == null || temperature < WARM_CELSIUS -> NORMAL_FRAME_INTERVAL_MS to NORMAL_JPEG_QUALITY
+            temperature < HOT_CELSIUS -> WARM_FRAME_INTERVAL_MS to WARM_JPEG_QUALITY
+            else -> HOT_FRAME_INTERVAL_MS to HOT_JPEG_QUALITY
+        }
+        frameIntervalMs = interval
+        jpegQuality = quality
+        isThrottled = interval != NORMAL_FRAME_INTERVAL_MS
     }
 
     private fun updateNotification() {
@@ -246,13 +308,27 @@ class StreamService : LifecycleService() {
         private const val CHANNEL_ID = "stream"
         private const val NOTIFICATION_ID = 1
         private const val RESUME_NOTIFICATION_ID = 2
-        private const val JPEG_QUALITY = 60
-        private const val MIN_FRAME_INTERVAL_MS = 100L // ~10 fps, para caber bem no LTE
         private const val PREFS = "stream"
         private const val KEY_SHOULD_RUN = "shouldRun"
+        private const val HEALTH_INTERVAL_MS = 60_000L
+
+        // Qualidade por faixa de temperatura da bateria.
+        private const val WARM_CELSIUS = 40.0
+        private const val HOT_CELSIUS = 44.0
+        private const val NORMAL_FRAME_INTERVAL_MS = 100L // ~10 fps, para caber bem no LTE
+        private const val WARM_FRAME_INTERVAL_MS = 250L // ~4 fps
+        private const val HOT_FRAME_INTERVAL_MS = 1_000L // 1 fps
+        private const val NORMAL_JPEG_QUALITY = 60
+        private const val WARM_JPEG_QUALITY = 50
+        private const val HOT_JPEG_QUALITY = 40
 
         @Volatile
         var isRunning = false
+            private set
+
+        /** Qualidade reduzida porque o celular está quente. */
+        @Volatile
+        var isThrottled = false
             private set
 
         /** Se o usuário deixou a câmera ligada (para voltar a transmitir depois de reiniciar). */

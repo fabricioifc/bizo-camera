@@ -340,6 +340,7 @@ class MainActivity : AppCompatActivity() {
             if (running && since > 0) add(getString(R.string.status_uptime, formatDuration(System.currentTimeMillis() - since)))
             val drops = RelayClient.drops
             if (running && drops > 0) add(resources.getQuantityString(R.plurals.status_drops, drops, drops))
+            if (running && StreamService.isThrottled) add(getString(R.string.status_hot))
         }.joinToString(" · ")
         binding.statusDetail.text = statusNotice ?: listOf(getString(detail), connection).filter { it.isNotEmpty() }.joinToString("\n")
 

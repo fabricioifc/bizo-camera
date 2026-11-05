@@ -144,6 +144,11 @@ class RelayClient(context: Context) {
         socket?.send(jpeg.toByteString())
     }
 
+    /** Envia uma mensagem de controle (JSON) ao servidor, como a saúde do aparelho. */
+    fun sendMessage(json: JSONObject) {
+        socket?.send(json.toString())
+    }
+
     private fun post(path: String, json: String, session: String?): JSONObject? {
         val builder = Request.Builder()
             .url("$baseUrl$path")

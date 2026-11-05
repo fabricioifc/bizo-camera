@@ -41,6 +41,7 @@ const STATIC_FILES = new Map([
 const store = new Store(process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'db.json'));
 const deviceSockets = new Map(); // deviceId -> WebSocket da câmera
 const viewerSockets = new Map(); // deviceId -> Set<WebSocket> dos visualizadores
+const deviceHealth = new Map(); // deviceId -> { battery, charging, temperature, throttled, updatedAt }
 const rateBuckets = new Map(); // chave -> { count, resetAt }
 const pendingMfa = new Map(); // sha256(mfaToken) -> { email, expiresAt, attempts }
 const pendingOauth = new Map(); // state -> { verifier, nonce, expiresAt }
@@ -189,7 +190,37 @@ function authenticateDevice(deviceId, secret) {
 
 function deviceView(id) {
   const device = store.data.devices[id];
-  return { id, name: device.name, online: deviceSockets.has(id) };
+  const online = deviceSockets.has(id);
+  return { id, name: device.name, online, health: online ? deviceHealth.get(id) || null : null };
+}
+
+// Saúde enviada pela câmera. Só aceita campos conhecidos, com valores plausíveis.
+function parseHealth(message) {
+  const battery = Number(message.battery);
+  const temperature = Number(message.temperature);
+  return {
+    battery: Number.isFinite(battery) ? Math.min(100, Math.max(0, Math.round(battery))) : null,
+    charging: message.charging === true,
+    temperature: Number.isFinite(temperature) && temperature > -40 && temperature < 100
+      ? Math.round(temperature * 10) / 10
+      : null,
+    throttled: message.throttled === true,
+    updatedAt: Date.now(),
+  };
+}
+
+function handleDeviceMessage(deviceId, data) {
+  let message;
+  try {
+    message = JSON.parse(data.toString());
+  } catch {
+    return;
+  }
+  if (message && message.type === 'health') {
+    const health = parseHealth(message);
+    deviceHealth.set(deviceId, health);
+    notifyViewers(deviceId, { type: 'health', health });
+  }
 }
 
 // Contagem de códigos 2FA errados: bloqueia a conta por um tempo depois de várias tentativas.
@@ -533,7 +564,7 @@ function attachDevice(deviceId, ws) {
   });
 
   ws.on('message', (data, isBinary) => {
-    if (!isBinary) return;
+    if (!isBinary) return handleDeviceMessage(deviceId, data);
     for (const viewer of viewerSockets.get(deviceId) || []) {
       // Descarta quadros para quem está com a conexão lenta, em vez de acumular atraso.
       if (viewer.readyState === OPEN && viewer.bufferedAmount < MAX_BUFFERED_BYTES) {
@@ -545,6 +576,7 @@ function attachDevice(deviceId, ws) {
   ws.on('close', () => {
     if (deviceSockets.get(deviceId) === ws) {
       deviceSockets.delete(deviceId);
+      deviceHealth.delete(deviceId);
       notifyViewers(deviceId, { type: 'status', online: false });
     }
   });
@@ -568,6 +600,7 @@ function attachViewer(deviceId, ws) {
   });
 
   sendJsonWs(ws, { type: 'status', online: deviceSockets.has(deviceId) });
+  if (deviceHealth.has(deviceId)) sendJsonWs(ws, { type: 'health', health: deviceHealth.get(deviceId) });
   if (wasIdle) sendJsonWs(deviceSockets.get(deviceId), { type: 'start' });
 
   ws.on('close', () => {

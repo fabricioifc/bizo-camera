@@ -3,6 +3,8 @@
 
   // O token de sessão fica num cookie HttpOnly: esta página nunca o lê nem o guarda.
   const RECONNECT_MS = 3000;
+  const LIST_REFRESH_MS = 30_000;
+  const LOW_BATTERY = 20;
   const VIEWS = ['auth-view', 'mfa-view', 'security-view', 'list-view', 'viewer-view'];
 
   const els = {
@@ -37,11 +39,13 @@
     viewerView: document.getElementById('viewer-view'),
     back: document.getElementById('back'),
     title: document.getElementById('viewer-title'),
+    viewerHealth: document.getElementById('viewer-health'),
     frame: document.getElementById('frame'),
     status: document.getElementById('viewer-status'),
   };
 
   let viewer = null; // { device, ws, closing, retryTimer }
+  let listTimer = null;
   let lastFrameUrl = null;
   let pendingMfaToken = null;
   let signedIn = false;
@@ -269,17 +273,38 @@
     state.className = 'hint';
     state.textContent = device.online ? 'Online' : 'Offline';
 
+    const health = document.createElement('span');
+    showHealth(health, device.health);
+
     const button = document.createElement('button');
     button.textContent = 'Assistir';
     button.disabled = !device.online;
     button.addEventListener('click', () => openViewer(device));
 
-    card.append(top, state, button);
+    card.append(top, state, health, button);
     return card;
   }
 
+  // Bateria e temperatura do celular da câmera. Destaca bateria baixa e aquecimento.
+  function showHealth(el, health) {
+    el.className = 'hint health';
+    if (!health) {
+      el.textContent = '';
+      el.hidden = true;
+      return;
+    }
+    const parts = [];
+    if (health.battery !== null) parts.push(`Bateria ${health.battery}%${health.charging ? ' (carregando)' : ''}`);
+    if (health.temperature !== null) parts.push(`${Math.round(health.temperature)} °C`);
+    if (health.throttled) parts.push('quente, qualidade reduzida');
+    const lowBattery = health.battery !== null && health.battery < LOW_BATTERY && !health.charging;
+    el.classList.toggle('warn', lowBattery || health.throttled);
+    el.textContent = parts.join(' · ');
+    el.hidden = parts.length === 0;
+  }
+
   async function loadDevices() {
-    els.devices.replaceChildren();
+    clearTimeout(listTimer);
     try {
       const res = await api('/api/devices');
       setConnection(true);
@@ -291,10 +316,14 @@
       }
       const { devices } = await res.json();
       els.empty.hidden = devices.length > 0;
-      for (const device of devices) els.devices.append(deviceCard(device));
+      els.devices.replaceChildren(...devices.map(deviceCard));
     } catch {
       setConnection(false);
     }
+    // Atualiza status e saúde das câmeras enquanto a lista estiver aberta.
+    listTimer = setTimeout(() => {
+      if (!els.listView.hidden) loadDevices();
+    }, LIST_REFRESH_MS);
   }
 
   // ----- Transmissão ao vivo -----
@@ -328,8 +357,14 @@
       if (typeof event.data === 'string') {
         const msg = JSON.parse(event.data);
         if (msg.type === 'status') {
-          if (!msg.online) setViewerStatus('Câmera offline. Aguardando conexão…');
-          else if (els.frame.hidden) setViewerStatus('Conectado. Aguardando imagem…');
+          if (!msg.online) {
+            setViewerStatus('Câmera offline. Aguardando conexão…');
+            showHealth(els.viewerHealth, null);
+          } else if (els.frame.hidden) {
+            setViewerStatus('Conectado. Aguardando imagem…');
+          }
+        } else if (msg.type === 'health') {
+          showHealth(els.viewerHealth, msg.health);
         }
         return;
       }
@@ -349,6 +384,7 @@
     closeViewer();
     viewer = { device, ws: null, closing: false, retryTimer: null };
     els.title.textContent = device.name;
+    showHealth(els.viewerHealth, device.health);
     els.frame.hidden = true;
     setViewerStatus('Conectando…');
     showView('viewer-view');
