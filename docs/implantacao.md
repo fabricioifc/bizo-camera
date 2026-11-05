@@ -1,6 +1,6 @@
 # Implantação e operação
 
-Como publicar o servidor, configurar o acesso e cuidar dos dados. Para rodar em desenvolvimento, veja o [README do servidor](../relay-server/README.md).
+Como publicar o servidor, configurar o acesso e cuidar dos dados. Para rodar em desenvolvimento, veja o [README do servidor](../camera-web/README.md).
 
 ## Variáveis de ambiente
 
@@ -8,7 +8,7 @@ Como publicar o servidor, configurar o acesso e cuidar dos dados. Para rodar em 
 |---|---|---|
 | `PORT` | `8787` | Porta HTTP. |
 | `PUBLIC_URL` | `http://localhost:8787` | Endereço público do site. Usado no retorno do login com Google. Com `https://`, o cookie de sessão vira `Secure`. |
-| `DATA_FILE` | `relay-server/data/db.json` | Arquivo onde ficam usuários, câmeras e sessões. No Docker, é `/data/db.json`. |
+| `DATA_FILE` | `camera-web/data/db.json` | Arquivo onde ficam usuários, câmeras e sessões. No Docker, é `/data/db.json`. |
 | `ALLOW_SIGNUP` | (vazio) | Defina `1` para permitir novos cadastros além do primeiro usuário. |
 | `TRUST_PROXY` | (vazio) | Defina `1` atrás de um proxy ou túnel (cloudflared, Caddy, Nginx), para limitar tentativas por IP real. |
 | `REQUIRE_2FA` | `1` | Exige verificação em duas etapas no login e antes do acesso às câmeras. No Compose de desenvolvimento fica desativado. |
@@ -17,12 +17,12 @@ Como publicar o servidor, configurar o acesso e cuidar dos dados. Para rodar em 
 | `CLIP_STORAGE_MB` | `500` | Espaço total para os vídeos de movimento; acima disso, os mais antigos são apagados. |
 | `OFFLINE_ALERT_MS` | `300000` | Tempo sem conexão até o alerta "Câmera offline" (em milissegundos). |
 | `APP_PACKAGE` | `br.dev.bizo.cameramonitor` | Pacote do app aceito na atualização pelo próprio app. |
-| `WEB_DIR` | `relay-server/frontend/dist` | Pasta da página compilada servida pelo backend. |
+| `WEB_DIR` | `camera-web/frontend/dist` | Pasta da página compilada servida pelo backend. |
 | `BACKUP_SCHEDULE` | `0 6 * * *` | Horário diário do backup em UTC, no formato cron. |
 | `BACKUP_KEEP` | `14` | Quantidade de backups a manter. |
 | `BACKUP_DIR` | `./backups` | Pasta do servidor onde ficam os backups. No Dokploy, use uma pasta fixa (ex.: `/home/fabricio/backups/relay-server`), porque o código é clonado de novo a cada deploy. |
 
-No Docker, configure essas variáveis em `relay-server/.env`, criado a partir de `.env.example`. Esse arquivo é carregado pelo Docker Compose e está no `.gitignore`. Para publicar sua própria instância, defina `PUBLIC_URL` com o endereço HTTPS público e configure o túnel ou proxy para encaminhar o tráfego ao relay.
+No Docker, configure essas variáveis em `camera-web/.env`, criado a partir de `.env.example`. Esse arquivo é carregado pelo Docker Compose e está no `.gitignore`. Para publicar sua própria instância, defina `PUBLIC_URL` com o endereço HTTPS público e configure o túnel ou proxy para encaminhar o tráfego ao relay.
 
 ## Criar a primeira conta
 
@@ -43,7 +43,7 @@ ingress:
 
 O [Dokploy](https://dokploy.com) publica o `docker-compose.yml` direto do GitHub, a cada push na `main`. Para usar:
 
-1. Crie um serviço do tipo **Compose** com Provider **Git**, o endereço do repositório, a branch `main` e o Compose Path `./relay-server/docker-compose.yml`.
+1. Crie um serviço do tipo **Compose** com Provider **Git**, o endereço do repositório, a branch `main` e o Compose Path `./camera-web/docker-compose.yml`.
 2. Na aba **Environment**, informe as variáveis do `.env` e defina `BACKUP_DIR` com uma pasta fixa do servidor. O Dokploy clona o código de novo a cada deploy, então a pasta `./backups` não sobreviveria.
 3. Faça o primeiro deploy pelo botão **Deploy**.
 4. Para publicar a cada push, ligue o **Autodeploy** e cadastre a **Webhook URL** da aba **Deployments** nos webhooks do GitHub, com o evento de push.
@@ -54,7 +54,7 @@ Não é preciso cadastrar domínio no Dokploy quando o túnel aponta direto para
 
 O volume tem tudo o que não dá para recriar: contas, sessões, câmeras, fotos de movimento e as chaves dos alertas (`vapid.json`). O serviço `backup` do `docker-compose.yml` cuida disso sozinho: sobe junto com o servidor (`docker compose up -d`), faz uma cópia ao iniciar e outra todo dia às 03:00 de Brasília.
 
-- As cópias ficam em `relay-server/backups/relay-data-<data>.tar.gz` (fora do git; a data no nome é em UTC), ou na pasta definida em `BACKUP_DIR`.
+- As cópias ficam em `camera-web/backups/relay-data-<data>.tar.gz` (fora do git; a data no nome é em UTC), ou na pasta definida em `BACKUP_DIR`.
 - Guarda as 14 mais recentes. Horário e quantidade ficam em `BACKUP_SCHEDULE` (formato do cron, em UTC) e `BACKUP_KEEP`, no `docker-compose.yml`.
 - O volume é montado só para leitura no serviço de backup, então ele nunca altera os dados.
 - Leve as cópias para fora do computador de vez em quando (pendrive ou nuvem privada).

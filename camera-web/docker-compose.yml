@@ -48,6 +48,6 @@ services:
 
 volumes:
   relay-data:
-    # Nome fixo: o mesmo volume vale rodando daqui (projeto relay-server) ou pelo Dokploy,
-    # que usa outro nome de projeto. Sem isso, o Dokploy criaria um volume vazio.
+    # Nome fixo (de quando a pasta se chamava relay-server): o mesmo volume vale rodando daqui ou
+    # pelo Dokploy, que usa outro nome de projeto. Sem isso, nasceria um volume vazio. Não mude.
     name: relay-server_relay-data

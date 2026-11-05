@@ -62,8 +62,8 @@ flowchart LR
 
 | Pasta | O que é |
 |---|---|
-| [camera-monitor](camera-monitor) | App Android em Kotlin, com CameraX. Roda no celular que fica fixado no local. |
-| [relay-server](relay-server) | Servidor Node e site em Vue 3. Liga a câmera aos visualizadores. |
+| [camera-app](camera-app) | App Android em Kotlin, com CameraX. Roda no celular que fica fixado no local. |
+| [camera-web](camera-web) | Servidor Node e site em Vue 3. Liga a câmera aos visualizadores. |
 | [docs](docs) | Documentação detalhada e capturas de tela. |
 
 ## Começando
@@ -73,13 +73,13 @@ Você vai precisar de Docker, de Android Studio e de um cliente OAuth do Google,
 1. Suba o servidor e o site em modo de desenvolvimento:
 
    ```bash
-   cd relay-server
+   cd camera-web
    cp .env.example .env
    docker compose -f docker-compose.dev.yml up -d --build
    ```
 
 2. Abra `http://localhost:5173`.
-3. Abra a pasta `camera-monitor` no Android Studio e instale o build debug no celular ([passo a passo](camera-monitor/README.md)).
+3. Abra a pasta `camera-app` no Android Studio e instale o build debug no celular ([passo a passo](camera-app/README.md)).
 4. No app, informe o endereço do computador (por exemplo, `192.168.1.20:8787`) e entre com a mesma conta.
 5. Na aba **Início**, toque em **Iniciar câmera**.
 
@@ -90,8 +90,8 @@ Para publicar de verdade, com HTTPS e túnel, veja [Implantação e operação](
 - [Funcionalidades](docs/funcionalidades.md): como cada recurso funciona.
 - [Implantação e operação](docs/implantacao.md): variáveis de ambiente, túnel, Dokploy, backup, login com Google e 2FA.
 - [API](docs/api.md): rotas HTTP e WebSocket.
-- [Servidor e site](relay-server/README.md): desenvolvimento, testes e organização do código.
-- [App Android](camera-monitor/README.md): compilar, testar, gerar versão e organização do código.
+- [Servidor e site](camera-web/README.md): desenvolvimento, testes e organização do código.
+- [App Android](camera-app/README.md): compilar, testar, gerar versão e organização do código.
 
 ## Como contribuir
 
@@ -102,12 +102,12 @@ Contribuições são bem-vindas. Para mudanças grandes, abra uma issue antes, p
 3. Rode os testes da parte que você alterou:
 
    ```bash
-   cd relay-server/frontend && npm install
+   cd camera-web/frontend && npm install
    cd ../backend && npm install && npm test
    ```
 
    ```bash
-   cd camera-monitor && ./gradlew testDebugUnitTest
+   cd camera-app && ./gradlew testDebugUnitTest
    ```
 
 4. Abra um pull request explicando o que mudou, por que mudou e como você testou. Mudanças em telas ficam mais fáceis de revisar com uma captura.
@@ -116,7 +116,7 @@ Contribuições são bem-vindas. Para mudanças grandes, abra uma issue antes, p
 
 - Textos da interface, comentários e mensagens de commit são em português.
 - Se mudar uma configuração ou um comportamento, atualize a documentação junto.
-- Se o site e o app trocarem uma configuração nova, ela precisa passar pelas três partes: app, `relay-server/backend/src/services/camera-settings.js` e site.
+- Se o site e o app trocarem uma configuração nova, ela precisa passar pelas três partes: app, `camera-web/backend/src/services/camera-settings.js` e site.
 - Nunca envie `.env`, keystore, `keystore.properties` ou qualquer segredo.
 
 **Falhas de segurança:** não abra issue pública. Use a [denúncia privada de vulnerabilidade](https://github.com/fabricioifc/bizo-camera/security/advisories/new) do GitHub.

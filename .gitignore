@@ -5,5 +5,5 @@ desktop.ini
 .DS_Store
 
 # Cada projeto tem o seu próprio .gitignore:
-#   relay-server/.gitignore
-#   camera-monitor/.gitignore
+#   camera-web/.gitignore
+#   camera-app/.gitignore

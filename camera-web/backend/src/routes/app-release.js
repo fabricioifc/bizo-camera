@@ -46,7 +46,7 @@ function appReleaseRoutes(router, app) {
     if (!requireFullSession(ctx)) return;
     const latest = releases.latest();
     if (!latest || !fs.existsSync(releases.apkPath)) return sendJson(ctx.res, 404, { error: 'no_release' });
-    const name = `camera-monitor-${String(latest.versionName).replace(/[^\w.-]/g, '')}.apk`;
+    const name = `camera-app-${String(latest.versionName).replace(/[^\w.-]/g, '')}.apk`;
     ctx.res.writeHead(200, {
       'Content-Type': 'application/vnd.android.package-archive',
       'Content-Length': fs.statSync(releases.apkPath).size,

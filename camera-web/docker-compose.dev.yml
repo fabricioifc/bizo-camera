@@ -49,3 +49,5 @@ services:
 
 volumes:
   relay-data-dev:
+    # Nome fixo (de quando a pasta se chamava relay-server), para manter os dados de desenvolvimento.
+    name: relay-server_relay-data-dev

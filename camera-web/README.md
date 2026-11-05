@@ -17,7 +17,7 @@ Requer Docker Desktop (ou Docker Engine + Compose). O `Dockerfile` compila o fro
 Configure as variáveis de ambiente antes de iniciar pela primeira vez:
 
 ```bash
-cd relay-server
+cd camera-web
 cp .env.example .env
 ```
 
@@ -69,7 +69,7 @@ Para apagar os dados junto com o volume, use `docker compose down -v`. Isso remo
 Com o backend rodando na 8787 (pelo Compose de desenvolvimento, ou com `npm run dev` em `backend/`, que reinicia a cada alteração):
 
 ```bash
-cd relay-server/frontend
+cd camera-web/frontend
 npm install
 npm run dev
 ```
@@ -79,7 +79,7 @@ Abra `http://localhost:5173`. O Vite encaminha a API, o retorno do login com Goo
 ## Rodar sem Docker
 
 ```bash
-cd relay-server/frontend
+cd camera-web/frontend
 npm install
 npm run build
 cd ../backend
@@ -93,7 +93,7 @@ Abra http://localhost:8787 no navegador.
 
 Os testes ficam em `backend/tests/` e usam o executor do próprio Node (`node --test`). Cada arquivo sobe o servidor de verdade numa porta livre, com um banco temporário: login e sessões, 2FA, login com Google (com chave falsa), saúde, movimento e gerenciamento das câmeras, permissões das fotos, alertas e arquivos da página. Antes, o `npm test` compila o frontend, porque um dos testes confere a página servida.
 
-Num container, sem precisar de Node instalado (PowerShell ou Git Bash, na pasta `relay-server`):
+Num container, sem precisar de Node instalado (PowerShell ou Git Bash, na pasta `camera-web`):
 
 ```bash
 docker run --rm -v "${PWD}:/app" -v /app/backend/node_modules -v /app/frontend/node_modules -w /app node:20-alpine sh -c "cd frontend && npm ci && cd ../backend && npm ci && npm test"

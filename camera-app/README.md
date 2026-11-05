@@ -1,10 +1,10 @@
 # App da câmera (Android)
 
-Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadros JPEG para o [servidor de retransmissão](../relay-server/README.md) quando há alguém assistindo.
+Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadros JPEG para o [servidor de retransmissão](../camera-web/README.md) quando há alguém assistindo.
 
 ## Compilar e instalar
 
-1. Abra a pasta `camera-monitor` no Android Studio.
+1. Abra a pasta `camera-app` no Android Studio.
 2. O endereço do servidor é `https://camera.bizo.dev.br` por padrão. Ele pode ser trocado no próprio app, sem gerar outro APK: no cartão de login (**Servidor: …**) ou em **Configurações > Servidor**. O app confere se o endereço responde antes de salvar e, com a câmera ligada, reconecta no endereço novo. Para mudar o padrão do build, passe a propriedade `relayUrl` ao Gradle:
    - Linha de comando: `./gradlew assembleRelease -PrelayUrl=https://outro.dominio`
    - Ou, para valer em todos os builds, adicione `relayUrl=https://outro.dominio` em `~/.gradle/gradle.properties` (no Windows, `C:\Users\<usuário>\.gradle\gradle.properties`).
@@ -28,7 +28,7 @@ O Gradle precisa de um JDK entre 17 e 23. O Android Studio já traz um (por exem
 1. Aumente `appVersionName` em `gradle.properties` (por exemplo, de `0.3.0` para `0.4.0`) e faça o commit. O `versionCode` é o número de commits do repositório, então cada release feito depois de um commit novo instala por cima do anterior.
 2. Gere o APK assinado com a mesma keystore de sempre:
    - **Android Studio:** *Build > Generate Signed App Bundle / APK > APK*, escolha a keystore e o build **release**.
-   - **Terminal:** crie `keystore.properties` na pasta `camera-monitor` (fora do git) com `storeFile`, `storePassword`, `keyAlias` e `keyPassword`, e rode `./gradlew assembleRelease`. O APK sai em `app/build/outputs/apk/release/app-release.apk`.
+   - **Terminal:** crie `keystore.properties` na pasta `camera-app` (fora do git) com `storeFile`, `storePassword`, `keyAlias` e `keyPassword`, e rode `./gradlew assembleRelease`. O APK sai em `app/build/outputs/apk/release/app-release.apk`.
 3. Publique: no site, em **Configurações > Atualização do app da câmera**, envie o `app-release.apk`. Os celulares avisam (notificação e aba Ajustes) e instalam com um toque em **Atualizar agora**; a câmera volta a transmitir sozinha depois. Na primeira vez, o Android pede para liberar o app em "Instalar apps desconhecidos".
    Sem o site (ou na primeira instalação), instale por cabo, por cima da versão anterior.
 
@@ -79,7 +79,7 @@ A aba **Câmera** muda lente, zoom, qualidade, rotação extra (a imagem já aco
 O logotipo original fica em `branding/logo.webp`. Para trocar, substitua a imagem e gere os ícones de novo (precisa de Python com Pillow):
 
 ```bash
-python branding/make_icons.py branding/logo.webp app/src/main/res branding/preview.png ../relay-server/frontend/public
+python branding/make_icons.py branding/logo.webp app/src/main/res branding/preview.png ../camera-web/frontend/public
 ```
 
 O script tira o fundo branco, gera os ícones em todas as densidades (`mipmap-*`) e salva uma prévia do ícone redondo em `branding/preview.png`. A splash usa o mesmo desenho (`ic_launcher_foreground`). Com o último argumento, gera também o favicon e os ícones do site (`favicon.ico`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` para a instalação como app e `apple-touch-icon.png`).

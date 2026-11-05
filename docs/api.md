@@ -1,6 +1,6 @@
 # API do servidor
 
-Rotas HTTP e WebSocket do `relay-server`.
+Rotas HTTP e WebSocket do `camera-web`.
 
 - `GET /api/config`: diz se o cadastro está aberto (`signupOpen`) e se o Google está ativo (`googleEnabled`).
 - `POST /api/auth/mfa`: segunda etapa do login pelo Google, com `mfaToken` e `code` (app ou recuperação).
