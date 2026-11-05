@@ -9,6 +9,9 @@ export const MESSAGES = {
   setup_required: 'Comece a configuração antes de confirmar o código.',
   not_enabled: 'A verificação em duas etapas não está ativa.',
   invalid_credentials: 'Senha incorreta.',
+  invalid_apk: 'Este arquivo não é um APK válido.',
+  wrong_package: 'Este APK não é do app Monitor de Câmera (confira se é o build release).',
+  too_large: 'Arquivo grande demais (máximo de 64 MB).',
   'error=google': 'Não foi possível entrar com o Google. Tente de novo.',
   'error=signup_disabled': 'O cadastro está fechado. Peça acesso ao dono do servidor.',
 };

@@ -773,6 +773,10 @@ code,
   min-width: 160px;
 }
 
+.release-message {
+  padding-top: 0;
+}
+
 .page-narrow .segmented {
   max-width: 360px;
 }

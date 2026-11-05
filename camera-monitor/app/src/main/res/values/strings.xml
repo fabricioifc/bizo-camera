@@ -71,7 +71,6 @@
     <string name="sensitivity_high_hint">Percebe movimentos pequenos; pode avisar por mudanças de luz.</string>
 
     <!-- Aba Ajustes -->
-    <string name="settings_version">Monitor de Câmera · versão %1$s (%2$d)</string>
     <string name="appearance_title">Aparência</string>
     <string name="theme_label">Tema</string>
     <string name="theme_system">Sistema</string>
@@ -153,6 +152,29 @@
     <string name="recovery_title">Guarde os códigos de recuperação</string>
     <string name="recovery_done_button">Já guardei os códigos</string>
     <string name="recovery_prompt">Use um destes códigos se perder o app autenticador. Cada um vale uma vez e eles não serão mostrados de novo.\n\n%1$s</string>
+
+    <!-- Atualização do app -->
+    <string name="update_title">Atualização</string>
+    <string name="update_installed">Instalada: versão %1$s (%2$d)</string>
+    <string name="update_checking">Procurando atualização…</string>
+    <string name="update_up_to_date">Você está na versão mais recente.</string>
+    <string name="update_available">Versão %1$s disponível.</string>
+    <string name="update_downloading">Baixando versão %1$s… %2$d%%</string>
+    <string name="update_installing">Confirme a instalação na tela do Android. A câmera volta sozinha depois.</string>
+    <string name="update_check_button">Procurar atualização</string>
+    <string name="update_install_button">Atualizar agora</string>
+    <string name="update_download_failed">Não foi possível baixar a atualização. Tente de novo.</string>
+    <string name="update_install_failed">A atualização não foi instalada. O APK precisa ser assinado com a mesma chave do app.</string>
+    <string name="update_cancelled">Instalação cancelada.</string>
+    <string name="update_play_protect">O Play Protect não liberou a instalação. Toque em Procurar atualização e tente de novo; se aparecer o aviso do Play Protect, escolha instalar mesmo assim.</string>
+    <string name="update_permission_title">Permitir atualizações</string>
+    <string name="update_permission_text">Para instalar versões novas, o Android precisa que você libere este app em "Instalar apps desconhecidos". Isso só é pedido uma vez.</string>
+    <string name="update_permission_button">Abrir configuração</string>
+    <string name="update_snackbar">Versão %1$s disponível</string>
+    <string name="update_snackbar_action">Ver</string>
+    <string name="update_channel">Atualizações do app</string>
+    <string name="update_notification_title">Atualização disponível</string>
+    <string name="update_notification_text">Versão %1$s do Monitor de Câmera. Toque para instalar.</string>
 
     <!-- Notificação -->
     <string name="notif_channel">Transmissão da câmera</string>

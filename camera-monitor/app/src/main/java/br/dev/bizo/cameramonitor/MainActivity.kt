@@ -1,6 +1,7 @@
 package br.dev.bizo.cameramonitor
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.SystemClock
@@ -63,6 +64,23 @@ class MainActivity : AppCompatActivity() {
     }
     private var exitHint: Snackbar? = null
 
+    // Versão nova encontrada: avisa uma vez por abertura do app, com atalho para a aba Ajustes.
+    private var updateHintShown = false
+    private val updateListener: () -> Unit = {
+        runOnUiThread {
+            val state = AppUpdater.state
+            if (state is AppUpdater.State.Available && !updateHintShown && relay.isSignedIn &&
+                binding.bottomNav.selectedItemId != R.id.nav_settings
+            ) {
+                updateHintShown = true
+                Snackbar.make(binding.root, getString(R.string.update_snackbar, state.release.versionName), Snackbar.LENGTH_LONG)
+                    .setAnchorView(binding.bottomNav)
+                    .setAction(R.string.update_snackbar_action) { openTab(R.id.nav_settings) }
+                    .show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Abertura com o logotipo; precisa vir antes do super.onCreate.
         installSplashScreen()
@@ -84,6 +102,19 @@ class MainActivity : AppCompatActivity() {
         // Na primeira abertura, começa no Início; ao recriar (ex.: troca de tema), a aba é restaurada.
         if (savedInstanceState == null) showTab(R.id.nav_home)
         updateSignedIn()
+        handleIntent(intent)
+    }
+
+    // Notificação de atualização: abre a aba Ajustes, onde fica o botão de atualizar.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(AppUpdater.EXTRA_OPEN_UPDATE, false) != true) return
+        intent.removeExtra(AppUpdater.EXTRA_OPEN_UPDATE)
+        if (relay.isSignedIn) binding.root.post { openTab(R.id.nav_settings) }
     }
 
     override fun onResume() {
@@ -95,11 +126,19 @@ class MainActivity : AppCompatActivity() {
         }
         updateToolbar(binding.bottomNav.selectedItemId)
         updateSignedIn()
+        AppUpdater.addListener(updateListener)
+        // Procura versão nova ao abrir o app (no máximo a cada 6 horas).
+        if (relay.isSignedIn) AppUpdater.check(this, onlyIfStaleMs = UPDATE_CHECK_MS)
         // A câmera estava ligada (ex.: pausada após reiniciar o celular): abrir o app retoma a transmissão.
         // Na aba Início, quem faz isso é o HomeFragment, que antes libera a prévia.
         if (binding.bottomNav.selectedItemId != R.id.nav_home && shouldResumeStreaming()) {
             CameraStarter.start(this, relay, io) { error -> error?.let(::showMessage) }
         }
+    }
+
+    override fun onPause() {
+        AppUpdater.removeListener(updateListener)
+        super.onPause()
     }
 
     override fun onStop() {
@@ -186,5 +225,6 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val STATE_UNLOCKED = "unlocked"
         const val EXIT_WINDOW_MS = 2_000L
+        const val UPDATE_CHECK_MS = 6 * 60 * 60_000L
     }
 }

@@ -13,10 +13,12 @@ const { createMfaChallenges } = require('./services/mfa');
 const { createHub } = require('./services/hub');
 const { createAlerts } = require('./services/alerts');
 const { createDevices } = require('./services/devices');
+const { createReleases } = require('./services/releases');
 const { authRoutes } = require('./routes/auth');
 const { accountRoutes } = require('./routes/account');
 const { deviceRoutes } = require('./routes/devices');
 const { pushRoutes } = require('./routes/push');
+const { appReleaseRoutes } = require('./routes/app-release');
 const { attachWebSockets } = require('./websocket');
 
 const SWEEP_MS = 10 * 60 * 1000;
@@ -38,6 +40,7 @@ function createApp(config) {
     mfa: createMfaChallenges({ accounts }),
     devices: createDevices({ store, hub, alerts, snapshotDir: config.snapshotDir }),
     rateLimit: createRateLimiter({ trustProxy: config.trustProxy }),
+    releases: createReleases({ dataDir: config.dataDir, appPackage: config.appPackage }),
   };
 
   const router = createRouter();
@@ -45,6 +48,7 @@ function createApp(config) {
   accountRoutes(router, app);
   deviceRoutes(router, app);
   pushRoutes(router, app);
+  appReleaseRoutes(router, app);
   const serveStatic = createStaticHandler(config.webDir);
 
   const server = http.createServer(async (req, res) => {

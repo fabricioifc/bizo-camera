@@ -38,6 +38,25 @@ function readJson(req) {
   });
 }
 
+/** Lê o corpo inteiro como bytes, até [limit]. Lança 'too_large' se passar. */
+function readBody(req, limit) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        req.destroy();
+        reject(new Error('too_large'));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 function bearerToken(req) {
   const header = req.headers.authorization || '';
   return header.startsWith('Bearer ') ? header.slice(7) : null;
@@ -57,4 +76,4 @@ function requestToken(req) {
   return bearerToken(req) || cookieToken(req);
 }
 
-module.exports = { sendJson, redirect, readJson, bearerToken, cookieToken, requestToken };
+module.exports = { sendJson, redirect, readJson, readBody, bearerToken, cookieToken, requestToken };

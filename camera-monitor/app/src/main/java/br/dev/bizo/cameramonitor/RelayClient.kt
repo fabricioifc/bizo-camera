@@ -11,6 +11,8 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
+import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -163,6 +165,79 @@ class RelayClient(context: Context) {
     /** Derruba a conexão atual; ela volta sozinha em alguns segundos (com o endereço atual do servidor). */
     fun reconnect() {
         socket?.cancel()
+    }
+
+    /** Versão do app publicada no servidor, ou null (sem versão, sem sessão ou sem conexão). Bloqueia. */
+    fun latestRelease(): AppRelease? {
+        val session = prefs.getString(KEY_SESSION, null) ?: return null
+        val request = Request.Builder()
+            .url("$baseUrl/api/app/latest")
+            .header("Authorization", "Bearer $session")
+            .get()
+            .build()
+        return try {
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val json = JSONObject(response.body!!.string())
+                AppRelease(
+                    packageName = json.getString("packageName"),
+                    versionCode = json.getInt("versionCode"),
+                    versionName = json.getString("versionName"),
+                    size = json.getLong("size"),
+                    sha256 = json.getString("sha256"),
+                )
+            }
+        } catch (e: Exception) {
+            lastError = "${e.javaClass.simpleName} em /api/app/latest: ${e.message}"
+            null
+        }
+    }
+
+    /**
+     * Baixa o APK publicado em [target], conferindo tamanho e sha256 com [release].
+     * [onProgress] recebe de 0 a 100. Devolve false se falhar ou se o arquivo não bater. Bloqueia.
+     */
+    fun downloadRelease(release: AppRelease, target: File, onProgress: (Int) -> Unit): Boolean {
+        val session = prefs.getString(KEY_SESSION, null) ?: return false
+        val request = Request.Builder()
+            .url("$baseUrl/api/app/download")
+            .header("Authorization", "Bearer $session")
+            .get()
+            .build()
+        return try {
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return false
+                val digest = MessageDigest.getInstance("SHA-256")
+                var received = 0L
+                var lastPercent = -1
+                target.parentFile?.mkdirs()
+                response.body!!.byteStream().use { input ->
+                    target.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                            digest.update(buffer, 0, read)
+                            received += read
+                            val percent = (received * 100 / maxOf(release.size, 1)).toInt().coerceIn(0, 100)
+                            if (percent != lastPercent) {
+                                lastPercent = percent
+                                onProgress(percent)
+                            }
+                        }
+                    }
+                }
+                val hash = digest.digest().joinToString("") { "%02x".format(it) }
+                val ok = received == release.size && hash == release.sha256
+                if (!ok) target.delete()
+                ok
+            }
+        } catch (e: Exception) {
+            lastError = "${e.javaClass.simpleName} em /api/app/download: ${e.message}"
+            target.delete()
+            false
+        }
     }
 
     /** Confere se [url] responde como um servidor do Monitor de Câmera. Bloqueia: chame fora da thread principal. */

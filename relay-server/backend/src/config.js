@@ -25,6 +25,8 @@ function loadConfig(env = process.env) {
       clientSecret: googleClientSecret,
       enabled: Boolean(googleClientId && googleClientSecret),
     },
+    // Pacote do app aceito nas atualizações (o build debug usa o sufixo .debug).
+    appPackage: env.APP_PACKAGE || 'br.dev.bizo.cameramonitor',
     dataFile,
     dataDir,
     snapshotDir: path.join(dataDir, 'snapshots'),

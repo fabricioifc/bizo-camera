@@ -22,7 +22,8 @@ val googleServerClientId: String = (findProperty("googleServerClientId") as Stri
 // Versão: o nome vem de appVersionName (gradle.properties) e o código é o número de commits,
 // que sempre cresce. Assim todo APK novo instala por cima do anterior sem editar este arquivo.
 val appVersionName: String = (findProperty("appVersionName") as String?) ?: "0.0.0"
-val appVersionCode: Int = runCatching {
+// Para testar a atualização pelo próprio app sem fazer commit: -PappVersionCode=999.
+val appVersionCode: Int = (findProperty("appVersionCode") as String?)?.toIntOrNull() ?: runCatching {
     providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }
         .standardOutput.asText.get().trim().toInt()
 }.getOrDefault(1)

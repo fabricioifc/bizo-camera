@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Aba Ajustes: aparência, proteção por PIN, servidor, conta e versão. -->
+<!-- Aba Ajustes: aparência, proteção por PIN, servidor, conta e atualização do app. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -197,11 +197,45 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Atualização pelo próprio app -->
         <TextView
-            android:id="@+id/versionText"
-            style="@style/OptionHint"
-            android:layout_marginTop="32dp"
-            android:gravity="center" />
+            style="@style/SectionTitle"
+            android:text="@string/update_title" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout style="@style/SectionCardContent">
+
+                <TextView
+                    android:id="@+id/updateInstalled"
+                    style="@style/OptionLabel" />
+
+                <TextView
+                    android:id="@+id/updateStatus"
+                    style="@style/OptionHint"
+                    android:layout_marginTop="4dp" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/updateProgress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:visibility="gone" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/updateButton"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/update_check_button" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 

@@ -16,6 +16,8 @@ services:
       PUBLIC_URL: http://localhost:5173
       TRUST_PROXY: "0"
       REQUIRE_2FA: "0"
+      # Atualização do app: em desenvolvimento, aceita o APK debug (pacote com .debug).
+      APP_PACKAGE: br.dev.bizo.cameramonitor.debug
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-0}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}

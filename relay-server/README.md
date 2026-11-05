@@ -191,6 +191,7 @@ Abra http://localhost:8787 no navegador.
 | `REQUIRE_2FA` | `1` | Exige verificação em duas etapas no login e antes do acesso às câmeras. No Compose de desenvolvimento fica desativado. |
 | `GOOGLE_CLIENT_ID` | (vazio) | Cliente OAuth do Google. Sem ele, o botão de login com Google fica desativado. |
 | `GOOGLE_CLIENT_SECRET` | (vazio) | Segredo do cliente OAuth. Nunca versione este valor. |
+| `APP_PACKAGE` | `br.dev.bizo.cameramonitor` | Pacote do app aceito na atualização pelo próprio app. |
 | `WEB_DIR` | `relay-server/frontend/dist` | Pasta da página compilada servida pelo backend. |
 | `BACKUP_SCHEDULE` | `0 6 * * *` | Horário diário do backup em UTC, no formato cron. |
 | `BACKUP_KEEP` | `14` | Quantidade de backups a manter. |
@@ -220,6 +221,14 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 - Depois de 5 códigos 2FA errados, a conta fica bloqueada por 15 minutos.
 - Login, cadastro e códigos 2FA têm limite de tentativas por IP, por minuto.
 - Cada código TOTP vale uma vez e códigos de recuperação são apagados depois de usados.
+
+## Atualização do app da câmera
+
+Em **Configurações**, o cartão **Atualização do app da câmera** recebe o APK de release (até 64 MB). O servidor lê o pacote e a versão de dentro do APK, recusa APKs de outros apps e guarda só a última versão em `releases/`, ao lado do banco (no Docker, dentro do volume, então entra no backup).
+
+Os celulares com o app procuram versão nova ao abrir o app, ao abrir a aba Ajustes e, com a câmera ligada, a cada 6 horas (com notificação). A instalação é feita pelo instalador do Android, que pede confirmação. O APK precisa ser assinado com a mesma chave do app instalado; senão, o Android recusa.
+
+`APP_PACKAGE` define o pacote aceito (padrão `br.dev.bizo.cameramonitor`). O Compose de desenvolvimento aceita o build debug (`br.dev.bizo.cameramonitor.debug`).
 
 ## Controle remoto
 
@@ -256,6 +265,9 @@ O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valor
 - `DELETE /api/devices/:id`: remove uma câmera, revoga suas credenciais e encerra suas conexões; os eventos e fotos dela também são apagados.
 - `GET /api/devices/:id/events`: últimos 20 movimentos da câmera.
 - `GET /api/events/:id/snapshot`: foto de um movimento.
+- `POST /api/app/release`: publica uma versão do app (corpo = o APK). Responde com pacote, versão, tamanho e sha256.
+- `GET /api/app/latest`: versão publicada (`packageName`, `versionCode`, `versionName`, `size`, `sha256`), ou 404.
+- `GET /api/app/download`: o APK publicado.
 - `GET /api/push/key`: chave pública VAPID para assinar as notificações.
 - `POST /api/push/subscribe` e `POST /api/push/unsubscribe`: ativa ou desativa os alertas neste navegador.
 - `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`. Além dos quadros, recebe mensagens `health`, `motion` e `settings` (estado atual das configurações) e envia à câmera `start`, `stop` e `configure` (mudanças pedidas pelo site).

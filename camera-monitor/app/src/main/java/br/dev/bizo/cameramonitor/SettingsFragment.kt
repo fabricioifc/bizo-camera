@@ -9,9 +9,10 @@ import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import br.dev.bizo.cameramonitor.databinding.FragmentSettingsBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.concurrent.Executors
 
-/** Aba Ajustes: tema, proteção por PIN, servidor, conta e versão. */
+/** Aba Ajustes: tema, proteção por PIN, servidor, conta e atualização do app. */
 class SettingsFragment : Fragment() {
 
     private var _binding: FragmentSettingsBinding? = null
@@ -20,13 +21,16 @@ class SettingsFragment : Fragment() {
     private val io = Executors.newSingleThreadExecutor()
     private val main get() = requireActivity() as MainActivity
 
+    private val updateListener: () -> Unit = { activity?.runOnUiThread { if (_binding != null) showUpdate() } }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        binding.versionText.text = getString(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
+        binding.updateInstalled.text = getString(R.string.update_installed, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
+        binding.updateButton.setOnClickListener { onUpdateClicked() }
         setUpTheme()
 
         val activity = requireActivity() as AppCompatActivity
@@ -52,6 +56,15 @@ class SettingsFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         refresh()
+        AppUpdater.addListener(updateListener)
+        // Ao abrir os Ajustes, procura versão nova (no máximo a cada 5 minutos).
+        AppUpdater.check(requireContext(), onlyIfStaleMs = 5 * 60_000L)
+        showUpdate()
+    }
+
+    override fun onPause() {
+        AppUpdater.removeListener(updateListener)
+        super.onPause()
     }
 
     override fun onDestroyView() {
@@ -78,6 +91,47 @@ class SettingsFragment : Fragment() {
             }
             if (mode != AppTheme.mode(context)) AppTheme.setMode(context, mode)
         }
+    }
+
+    // Cartão Atualização: estado da busca, do download e da instalação.
+    private fun showUpdate() {
+        val state = AppUpdater.state
+        binding.updateStatus.text = when (state) {
+            AppUpdater.State.Idle -> ""
+            AppUpdater.State.Checking -> getString(R.string.update_checking)
+            AppUpdater.State.UpToDate -> getString(R.string.update_up_to_date)
+            is AppUpdater.State.Available -> getString(R.string.update_available, state.release.versionName)
+            is AppUpdater.State.Downloading -> getString(R.string.update_downloading, state.release.versionName, state.percent)
+            is AppUpdater.State.Installing -> getString(R.string.update_installing)
+            is AppUpdater.State.Failed -> state.message
+        }
+        binding.updateProgress.visibility = if (state is AppUpdater.State.Downloading) View.VISIBLE else View.GONE
+        if (state is AppUpdater.State.Downloading) binding.updateProgress.setProgressCompat(state.percent, true)
+        binding.updateButton.setText(
+            if (state is AppUpdater.State.Available) R.string.update_install_button else R.string.update_check_button
+        )
+        binding.updateButton.isEnabled = state !is AppUpdater.State.Checking && state !is AppUpdater.State.Downloading
+    }
+
+    private fun onUpdateClicked() {
+        val context = requireContext()
+        if (AppUpdater.state !is AppUpdater.State.Available) {
+            AppUpdater.check(context)
+            return
+        }
+        if (!AppUpdater.canInstall(context)) {
+            // Primeira vez: o Android precisa liberar este app a instalar atualizações.
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.update_permission_title)
+                .setMessage(R.string.update_permission_text)
+                .setPositiveButton(R.string.update_permission_button) { _, _ ->
+                    startActivity(AppUpdater.installPermissionIntent(context))
+                }
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show()
+            return
+        }
+        AppUpdater.downloadAndInstall(context)
     }
 
     private fun refresh() {

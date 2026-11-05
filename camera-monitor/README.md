@@ -29,7 +29,8 @@ O Gradle precisa de um JDK entre 17 e 23. O Android Studio já traz um (por exem
 2. Gere o APK assinado com a mesma keystore de sempre:
    - **Android Studio:** *Build > Generate Signed App Bundle / APK > APK*, escolha a keystore e o build **release**.
    - **Terminal:** crie `keystore.properties` na pasta `camera-monitor` (fora do git) com `storeFile`, `storePassword`, `keyAlias` e `keyPassword`, e rode `./gradlew assembleRelease`. O APK sai em `app/build/outputs/apk/release/app-release.apk`.
-3. Instale no celular por cima da versão anterior e confira o login e a câmera.
+3. Publique: no site, em **Configurações > Atualização do app da câmera**, envie o `app-release.apk`. Os celulares avisam (notificação e aba Ajustes) e instalam com um toque em **Atualizar agora**; a câmera volta a transmitir sozinha depois. Na primeira vez, o Android pede para liberar o app em "Instalar apps desconhecidos".
+   Sem o site (ou na primeira instalação), instale por cabo, por cima da versão anterior.
 
 A versão aparece no fim da aba **Ajustes** (por exemplo, "versão 0.3.0 (17)").
 
@@ -48,6 +49,8 @@ A versão aparece no fim da aba **Ajustes** (por exemplo, "versão 0.3.0 (17)").
 - `SettingsFragment` (aba **Ajustes**): tema, PIN, servidor, conta e versão.
 - `LoginController`: login com Google, código 2FA, configuração do 2FA e códigos de recuperação.
 - `CameraStarter`: registra o aparelho e liga ou desliga o serviço da câmera.
+- `AppUpdater`, `AppRelease`, `InstallResultReceiver`: atualização pelo próprio app (procura a versão publicada no servidor, baixa conferindo o sha256 e entrega ao instalador do Android).
+- `RemoteSettings`: formato das configurações trocadas com o site (controle remoto).
 - `AppTheme`, `CameraMonitorApp`: tema do sistema, claro ou escuro, aplicado ao abrir o app. As cores ficam em `res/values/colors.xml` (claro) e `res/values-night/colors.xml` (escuro).
 - `StreamService`: serviço em primeiro plano que mantém a câmera e a conexão.
 - `MotionDetector`, `ThermalLimit`, `DeviceHealth`, `FrameConversion`: peças usadas pelo serviço.

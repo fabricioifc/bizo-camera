@@ -1,12 +1,13 @@
 <script setup>
 import AlertsCard from '../components/AlertsCard.vue';
+import AppReleaseCard from '../components/AppReleaseCard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import ThemeToggle from '../components/ThemeToggle.vue';
 </script>
 
 <template>
   <PageHeader title="Configurações">
-    <template #subtitle>Valem só para este aparelho</template>
+    <template #subtitle>Alertas e aparência deste aparelho, e atualização do app da câmera</template>
   </PageHeader>
 
   <div class="page-narrow">
@@ -23,5 +24,7 @@ import ThemeToggle from '../components/ThemeToggle.vue';
         <ThemeToggle />
       </div>
     </section>
+
+    <AppReleaseCard />
   </div>
 </template>

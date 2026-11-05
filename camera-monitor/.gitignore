@@ -13,6 +13,7 @@ keystore.properties
 *.apk
 *.aab
 app/release/
+app/debug/
 .cxx/
 .kotlin/
 .DS_Store

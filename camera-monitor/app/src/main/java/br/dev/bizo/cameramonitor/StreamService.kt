@@ -86,6 +86,15 @@ class StreamService : LifecycleService() {
         updateNotification()
     }
 
+    // Com a câmera ligada (o app quase nunca fica aberto), procura versão nova a cada 6 horas
+    // e avisa por notificação.
+    private val updateTicker = object : Runnable {
+        override fun run() {
+            AppUpdater.check(this@StreamService, onlyIfStaleMs = UPDATE_CHECK_MS, notify = true)
+            handler.postDelayed(this, UPDATE_CHECK_MS)
+        }
+    }
+
     private val healthTicker = object : Runnable {
         override fun run() {
             reportHealth()
@@ -147,6 +156,7 @@ class StreamService : LifecycleService() {
             relay.start()
             startCamera()
             healthTicker.run()
+            handler.postDelayed(updateTicker, UPDATE_FIRST_CHECK_MS)
         }
         return START_STICKY
     }
@@ -158,6 +168,7 @@ class StreamService : LifecycleService() {
         isThrottled = false
         cameraStarted = false
         handler.removeCallbacks(healthTicker)
+        handler.removeCallbacks(updateTicker)
         RelayClient.configureHandler = null
         camera = null
         CameraSettings.prefs(this).unregisterOnSharedPreferenceChangeListener(settingsListener)
@@ -379,6 +390,8 @@ class StreamService : LifecycleService() {
         private const val PREFS = "stream"
         private const val KEY_SHOULD_RUN = "shouldRun"
         private const val HEALTH_INTERVAL_MS = 60_000L
+        private const val UPDATE_FIRST_CHECK_MS = 2 * 60_000L
+        private const val UPDATE_CHECK_MS = 6 * 60 * 60_000L
 
         // Detecção de movimento: grade de 32x24 pontos conferida duas vezes por segundo e
         // intervalo mínimo entre alertas (igual ao do servidor).
