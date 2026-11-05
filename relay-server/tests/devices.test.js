@@ -112,6 +112,64 @@ describe('câmera, saúde e movimento', () => {
   });
 });
 
+describe('gerenciamento de câmeras', () => {
+  let server;
+  let account;
+  let stranger;
+  let camera;
+  let viewer;
+
+  before(async () => {
+    account = seedAccount();
+    stranger = randomToken();
+    account.db.users['outro@example.com'] = { id: 'u2', googleId: 'g2', createdAt: Date.now() };
+    account.db.sessions[sha256(stranger)] = { userId: 'u2', expiresAt: Date.now() + 3_600_000 };
+    account.db.events = [
+      { id: 'abcdef0123456789', deviceId: account.deviceId, at: Date.now(), snapshot: false },
+    ];
+    server = await startServer({ seed: account.db });
+    camera = await server.open(`/ws/device?id=${account.deviceId}`, { Authorization: `Bearer ${account.deviceSecret}` });
+    viewer = await server.open(`/ws/view?device=${account.deviceId}&token=${account.session}`);
+  });
+
+  after(async () => {
+    camera.close();
+    viewer.close();
+    await server.stop();
+  });
+
+  it('renomeia câmera após validar o nome e somente para o dono', async () => {
+    const route = `/api/devices/${account.deviceId}`;
+    assert.equal((await server.call('PATCH', route, { token: stranger, body: { name: 'Outra' } })).status, 404);
+    assert.equal((await server.call('PATCH', route, { body: { name: 'Sem sessão' } })).status, 401);
+    assert.equal((await server.call('PATCH', route, { token: account.session, body: null })).status, 400);
+    assert.equal((await server.call('PATCH', route, { token: account.session, body: { name: '   ' } })).status, 400);
+    assert.equal((await server.call('PATCH', route, { token: account.session, body: { name: 'x'.repeat(41) } })).status, 400);
+
+    const renamed = await server.call('PATCH', route, { token: account.session, body: { name: '  Sala  ' } });
+    assert.equal(renamed.status, 200);
+    assert.equal(renamed.data.name, 'Sala');
+    assert.equal((await server.call('GET', '/api/devices', { token: account.session })).data.devices[0].name, 'Sala');
+  });
+
+  it('remover revoga a câmera, encerra conexões e apaga os eventos associados', async () => {
+    const route = `/api/devices/${account.deviceId}`;
+    assert.equal((await server.call('DELETE', route, { token: stranger })).status, 404);
+    assert.equal((await server.call('DELETE', route)).status, 401);
+
+    const deleted = await server.call('DELETE', route, { token: account.session });
+    assert.equal(deleted.status, 200);
+    await wait(100);
+    assert.equal((await server.call('GET', '/api/devices', { token: account.session })).data.devices.length, 0);
+    assert.equal((await server.call('GET', `/api/devices/${account.deviceId}/events`, { token: account.session })).status, 404);
+    assert.ok(!server.readDb().devices[account.deviceId]);
+    assert.ok(!server.readDb().events.some((event) => event.deviceId === account.deviceId));
+    await assert.rejects(server.open(`/ws/device?id=${account.deviceId}`, { Authorization: 'Bearer invalid' }), /401/);
+    assert.equal(camera.readyState, camera.CLOSED);
+    assert.equal(viewer.readyState, viewer.CLOSED);
+  });
+});
+
 describe('arquivos da página', () => {
   let server;
 

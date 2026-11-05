@@ -518,6 +518,50 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { devices });
   }
 
+  const deviceMatch = url.pathname.match(/^\/api\/devices\/([a-f0-9]{16})$/);
+  if (req.method === 'PATCH' && deviceMatch) {
+    const userId = requireFullSession(res, token);
+    if (!userId) return;
+    const device = store.data.devices[deviceMatch[1]];
+    if (!device || device.ownerId !== userId) return sendJson(res, 404, { error: 'not_found' });
+    const body = await readJson(req);
+    if (!body || typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 40) {
+      return sendJson(res, 400, { error: 'invalid_name' });
+    }
+    device.name = body.name.trim();
+    store.save();
+    return sendJson(res, 200, { ok: true, name: device.name });
+  }
+
+  if (req.method === 'DELETE' && deviceMatch) {
+    const userId = requireFullSession(res, token);
+    if (!userId) return;
+    const deviceId = deviceMatch[1];
+    const device = store.data.devices[deviceId];
+    if (!device || device.ownerId !== userId) return sendJson(res, 404, { error: 'not_found' });
+
+    delete store.data.devices[deviceId];
+    lastMotionAt.delete(deviceId);
+    deviceHealth.delete(deviceId);
+    const camera = deviceSockets.get(deviceId);
+    deviceSockets.delete(deviceId);
+    const viewers = viewerSockets.get(deviceId);
+    viewerSockets.delete(deviceId);
+    if (camera) {
+      sendJsonWs(camera, { type: 'stop' });
+      camera.close(1008, 'camera removed');
+    }
+    for (const viewer of viewers || []) viewer.close(1008, 'camera removed');
+
+    const removedEvents = store.data.events.filter((event) => event.deviceId === deviceId);
+    store.data.events = store.data.events.filter((event) => event.deviceId !== deviceId);
+    for (const event of removedEvents) {
+      if (event.snapshot) fs.rmSync(snapshotPath(event.id), { force: true });
+    }
+    store.save();
+    return sendJson(res, 200, { ok: true });
+  }
+
   // A câmera faz login uma vez e registra o aparelho na conta.
   if (route === 'POST /api/devices/register') {
     const userId = sessionUserId(token);

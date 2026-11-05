@@ -191,6 +191,31 @@ button.secondary {
   gap: 8px;
 }
 
+.device-actions button {
+  flex: 1;
+  padding: 8px;
+}
+
+.device-rename-form {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 0;
+}
+
+.device-rename-form input {
+  flex-basis: 100%;
+  letter-spacing: normal;
+  text-align: left;
+}
+
+.device-rename-form button {
+  flex: 1;
+}
+
+.device-message.error {
+  color: var(--danger);
+}
+
 #auth-form {
   flex-direction: column;
 }

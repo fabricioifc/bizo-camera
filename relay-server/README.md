@@ -55,7 +55,7 @@ Sem o nome do arquivo, `docker compose run --rm restore` só lista as cópias di
 
 ## Testes
 
-Roda os testes de `tests/` com o executor do próprio Node (`node --test`). Cada arquivo sobe o servidor de verdade numa porta livre, com um banco temporário: login e sessões, 2FA, login com Google (com chave falsa), saúde e movimento das câmeras, permissões das fotos, alertas e arquivos da página.
+Roda os testes de `tests/` com o executor do próprio Node (`node --test`). Cada arquivo sobe o servidor de verdade numa porta livre, com um banco temporário: login e sessões, 2FA, login com Google (com chave falsa), saúde, movimento e gerenciamento das câmeras, permissões das fotos, alertas e arquivos da página.
 
 Num container, sem precisar de Node instalado (PowerShell ou Git Bash, na pasta `relay-server`):
 
@@ -149,6 +149,8 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 - `POST /api/account/2fa/disable`: desativa o 2FA com senha (se houver) e um código.
 - `POST /api/devices/register`: a câmera, logada na conta, se registra e recebe `deviceId` e `deviceSecret`.
 - `GET /api/devices`: lista as câmeras da conta, o status online, a saúde do aparelho e o último movimento.
+- `PATCH /api/devices/:id`: renomeia uma câmera da conta (nome obrigatório, até 40 caracteres).
+- `DELETE /api/devices/:id`: remove uma câmera, revoga suas credenciais e encerra suas conexões; os eventos e fotos dela também são apagados.
 - `GET /api/devices/:id/events`: últimos 20 movimentos da câmera.
 - `GET /api/events/:id/snapshot`: foto de um movimento.
 - `GET /api/push/key`: chave pública VAPID para assinar as notificações.

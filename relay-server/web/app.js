@@ -63,6 +63,8 @@
   const MESSAGES = {
     account_locked: 'Conta bloqueada por 15 minutos após muitas senhas erradas.',
     invalid_code: 'Código incorreto. Confira o app autenticador e tente de novo.',
+    invalid_name: 'Digite um nome de até 40 caracteres.',
+    not_found: 'Esta câmera não existe mais ou não pertence à sua conta.',
     mfa_expired: 'A verificação expirou. Entre com o Google de novo.',
     too_many_requests: 'Muitas tentativas. Aguarde um minuto.',
     already_enabled: 'A verificação em duas etapas já está ativa.',
@@ -295,7 +297,78 @@
     button.disabled = !device.online;
     button.addEventListener('click', () => openViewer(device));
 
-    card.append(top, state, health, motion, button);
+    const actions = document.createElement('div');
+    actions.className = 'actions device-actions';
+    const rename = document.createElement('button');
+    rename.type = 'button';
+    rename.className = 'secondary';
+    rename.textContent = 'Renomear';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'danger';
+    remove.textContent = 'Remover';
+
+    const editForm = document.createElement('form');
+    editForm.className = 'device-rename-form';
+    editForm.hidden = true;
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = device.name;
+    nameInput.maxLength = 40;
+    nameInput.required = true;
+    nameInput.setAttribute('aria-label', 'Nome da câmera');
+    const saveName = document.createElement('button');
+    saveName.type = 'submit';
+    saveName.textContent = 'Salvar';
+    const cancelRename = document.createElement('button');
+    cancelRename.type = 'button';
+    cancelRename.className = 'secondary';
+    cancelRename.textContent = 'Cancelar';
+    const message = document.createElement('span');
+    message.className = 'hint device-message';
+    editForm.append(nameInput, saveName, cancelRename);
+
+    rename.addEventListener('click', () => {
+      editForm.hidden = false;
+      nameInput.focus();
+      nameInput.select();
+    });
+    cancelRename.addEventListener('click', () => {
+      editForm.hidden = true;
+      nameInput.value = device.name;
+      setMessage(message, '');
+    });
+    editForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      saveName.disabled = true;
+      try {
+        const res = await api(`/api/devices/${encodeURIComponent(device.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: nameInput.value }),
+        });
+        if (!res.ok) throw new Error(await errorText(res));
+        await loadDevices();
+      } catch (err) {
+        setMessage(message, err.message, true);
+      } finally {
+        saveName.disabled = false;
+      }
+    });
+    remove.addEventListener('click', async () => {
+      if (!window.confirm(`Remover "${device.name}" e revogar o acesso deste aparelho?`)) return;
+      remove.disabled = true;
+      try {
+        const res = await api(`/api/devices/${encodeURIComponent(device.id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await errorText(res));
+        await loadDevices();
+      } catch (err) {
+        setMessage(message, err.message, true);
+      } finally {
+        remove.disabled = false;
+      }
+    });
+    actions.append(rename, remove);
+    card.append(top, state, health, motion, button, actions, editForm, message);
     return card;
   }
 
@@ -463,8 +536,13 @@
       showFrame(event.data);
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (current.closing) return;
+      if (event.code === 1008) {
+        closeViewer();
+        showList();
+        return;
+      }
       setViewerStatus('Conexão perdida. Reconectando…');
       current.retryTimer = setTimeout(() => {
         if (viewer === current && !current.closing) connectViewer();
