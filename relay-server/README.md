@@ -126,6 +126,21 @@ ingress:
 
 A primeira conta pode ser criada sem configuração extra. Depois que existir um usuário, o cadastro fica fechado. Para abrir de novo, troque `ALLOW_SIGNUP` para `"1"` em `docker-compose.yml`, rode `docker compose up -d`, cadastre a conta e volte para `"0"`.
 
+## Organização do código
+
+```
+src/
+  server.js      ponto de entrada: lê a configuração e abre a porta
+  config.js      variáveis de ambiente
+  app.js         monta banco, serviços, rotas e WebSockets
+  websocket.js   /ws/device (câmera) e /ws/view (visualizador)
+  http/          resposta JSON, roteador, limite de tentativas, arquivos da página
+  routes/        rotas da API: auth, account (2FA), devices, push, e as verificações de sessão (guards)
+  services/      regras: sessões, contas, desafio do 2FA, câmeras e movimentos, alertas, conexões ao vivo (hub)
+  lib/           peças sem regra de negócio: banco JSON, TOTP, Google OIDC, Web Push, hashes
+frontend/        página em Vue (views, components, lib); o build vai para web/dist
+```
+
 ## Rodar sem Docker
 
 ```bash

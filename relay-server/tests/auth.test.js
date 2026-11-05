@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { describe, it, before, after } = require('node:test');
-const totp = require('../src/totp');
+const totp = require('../src/lib/totp');
 const { startServer, seedAccount } = require('./helpers');
 
 describe('login e sessões', () => {

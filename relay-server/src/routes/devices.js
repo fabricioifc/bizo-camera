@@ -1,0 +1,78 @@
+'use strict';
+
+const fs = require('node:fs/promises');
+const { readJson, sendJson } = require('../http/respond');
+const { requireFullSession } = require('./guards');
+
+const DEVICE = /^\/api\/devices\/([a-f0-9]{16})$/;
+const DEVICE_EVENTS = /^\/api\/devices\/([a-f0-9]{16})\/events$/;
+const EVENT_SNAPSHOT = /^\/api\/events\/([a-f0-9]{16})\/snapshot$/;
+
+/** Câmeras da conta: lista, registro, nome, remoção, movimentos e fotos. */
+function deviceRoutes(router, app) {
+  const { devices } = app;
+  const notFound = (res) => sendJson(res, 404, { error: 'not_found' });
+
+  router.get('/api/devices', (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    return sendJson(ctx.res, 200, { devices: devices.listFor(userId) });
+  });
+
+  // A câmera faz login uma vez e registra o aparelho na conta.
+  router.post('/api/devices/register', async (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    const body = await readJson(ctx.req);
+    return sendJson(ctx.res, 201, devices.register(userId, body.name));
+  });
+
+  router.patch(DEVICE, async (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    const device = devices.owned(userId, ctx.params[0]);
+    if (!device) return notFound(ctx.res);
+    const body = await readJson(ctx.req);
+    const name = devices.rename(device, body && body.name);
+    if (!name) return sendJson(ctx.res, 400, { error: 'invalid_name' });
+    return sendJson(ctx.res, 200, { ok: true, name });
+  });
+
+  router.delete(DEVICE, (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    if (!devices.owned(userId, ctx.params[0])) return notFound(ctx.res);
+    devices.remove(ctx.params[0]);
+    return sendJson(ctx.res, 200, { ok: true });
+  });
+
+  // Últimos movimentos de uma câmera da conta.
+  router.get(DEVICE_EVENTS, (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    if (!devices.owned(userId, ctx.params[0])) return notFound(ctx.res);
+    return sendJson(ctx.res, 200, { events: devices.recentEvents(ctx.params[0]) });
+  });
+
+  // Foto de um movimento: só para o dono da câmera.
+  router.get(EVENT_SNAPSHOT, async (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    const file = devices.snapshotFor(userId, ctx.params[0]);
+    let data;
+    try {
+      data = file && (await fs.readFile(file));
+    } catch {
+      data = null;
+    }
+    if (!data) return notFound(ctx.res);
+    ctx.res.writeHead(200, {
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': 'private, max-age=86400',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    ctx.res.end(data);
+  });
+}
+
+module.exports = { deviceRoutes };

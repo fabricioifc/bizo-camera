@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const totp = require('../src/totp');
+const totp = require('../src/lib/totp');
 
 // Segredo do vetor de teste da RFC 4226/6238 ("12345678901234567890" em base32).
 const RFC_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';

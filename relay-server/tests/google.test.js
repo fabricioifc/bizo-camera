@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { test, before, after } = require('node:test');
-const google = require('../src/google');
+const google = require('../src/lib/google');
 
 // Chave falsa do "Google": o fetch das chaves públicas é trocado por ela durante os testes.
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
