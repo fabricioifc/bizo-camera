@@ -16,6 +16,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Movimento detectado', {
       body,
+      icon: '/icon-192.png',
       // Uma notificação por câmera: um novo alerta substitui o anterior.
       tag: data.deviceId ? `motion-${data.deviceId}` : 'motion',
       renotify: true,

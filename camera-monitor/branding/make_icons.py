@@ -1,6 +1,8 @@
 """Gera os ícones do app (legado e adaptativo) a partir da imagem do logotipo.
 
-Uso: python make_icons.py <imagem> <pasta res> <arquivo de prévia>
+Uso: python make_icons.py <imagem> <pasta res> <arquivo de prévia> [pasta web do servidor]
+
+Com a pasta web, gera também favicon.ico, icon-192.png e apple-touch-icon.png para o site.
 """
 import os
 import sys
@@ -8,6 +10,7 @@ import sys
 from PIL import Image, ImageDraw
 
 src, res_dir, preview_path = sys.argv[1], sys.argv[2], sys.argv[3]
+web_dir = sys.argv[4] if len(sys.argv) > 4 else None
 
 DENSITIES = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
 BACKGROUND = (15, 17, 21, 255)  # #0F1115, o mesmo fundo do site e da splash
@@ -63,4 +66,15 @@ preview.paste(Image.new("RGBA", (inner.width + 20, inner.height + 40), (30, 30, 
 preview.alpha_composite(round_icon, (10, 20))
 preview.alpha_composite(round_icon, (inner.width + 40, 20))
 preview.convert("RGB").save(preview_path)
+
+# 4) Site: favicon (aba do navegador), ícone 192px (notificações e atalhos) e ícone do iPhone.
+if web_dir:
+    favicon = fit(256, 256)
+    favicon.save(os.path.join(web_dir, "favicon.ico"), sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
+    fit(192, 192).save(os.path.join(web_dir, "icon-192.png"), optimize=True)
+    # O iPhone pinta a transparência de preto; usa o fundo escuro do site com margem.
+    apple = Image.new("RGBA", (180, 180), BACKGROUND)
+    apple.alpha_composite(fit(180, 156))
+    apple.convert("RGB").save(os.path.join(web_dir, "apple-touch-icon.png"), optimize=True)
+
 print("ok", square.size, "recorte", box)

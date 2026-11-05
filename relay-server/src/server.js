@@ -42,6 +42,9 @@ const STATIC_FILES = new Map([
   ['/app.js', { file: 'app.js', type: 'text/javascript; charset=utf-8' }],
   ['/styles.css', { file: 'styles.css', type: 'text/css; charset=utf-8' }],
   ['/sw.js', { file: 'sw.js', type: 'text/javascript; charset=utf-8' }],
+  ['/favicon.ico', { file: 'favicon.ico', type: 'image/x-icon' }],
+  ['/icon-192.png', { file: 'icon-192.png', type: 'image/png' }],
+  ['/apple-touch-icon.png', { file: 'apple-touch-icon.png', type: 'image/png' }],
 ]);
 
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'db.json');
