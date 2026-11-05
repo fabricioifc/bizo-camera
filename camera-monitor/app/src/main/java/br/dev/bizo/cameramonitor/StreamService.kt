@@ -111,6 +111,11 @@ class StreamService : LifecycleService() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_RECONNECT) {
+            // Servidor trocado nas configurações: reconecta no endereço novo, sem parar a câmera.
+            if (cameraStarted) relay.reconnect() else stopSelf()
+            return START_STICKY
+        }
 
         setShouldRun(this, true)
         if (!startForegroundCompat()) {
@@ -311,6 +316,7 @@ class StreamService : LifecycleService() {
     companion object {
         private const val TAG = "StreamService"
         const val ACTION_STOP = "br.dev.bizo.cameramonitor.STOP"
+        const val ACTION_RECONNECT = "br.dev.bizo.cameramonitor.RECONNECT"
         private const val CHANNEL_ID = "stream"
         private const val NOTIFICATION_ID = 1
         private const val RESUME_NOTIFICATION_ID = 2

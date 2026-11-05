@@ -206,6 +206,28 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp" />
 
+            <!-- Servidor: endereço salvo no aparelho -->
+            <TextView
+                style="@style/SettingsSection"
+                android:text="@string/server_title" />
+
+            <TextView
+                android:id="@+id/serverText"
+                style="@style/SettingsHint" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/serverButton"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/server_change" />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp" />
+
             <!-- Conta -->
             <TextView
                 style="@style/SettingsSection"

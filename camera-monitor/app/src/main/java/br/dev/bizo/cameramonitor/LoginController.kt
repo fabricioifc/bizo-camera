@@ -44,7 +44,16 @@ class LoginController(
                 false
             }
         }
+        views.serverButton.setOnClickListener {
+            ServerDialog.show(activity, relay, io) { updateServerLabel() }
+        }
+        updateServerLabel()
         showStep(Step.SIGN_IN)
+    }
+
+    private fun updateServerLabel() {
+        views.serverButton.text =
+            activity.getString(R.string.login_server, ServerDialog.displayName(ServerSettings.url(activity)))
     }
 
     private fun onButtonClicked() {

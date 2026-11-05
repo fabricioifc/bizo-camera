@@ -26,9 +26,12 @@ import java.util.concurrent.TimeUnit
  */
 class RelayClient(context: Context) {
 
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    private val baseUrl = BuildConfig.RELAY_URL.trimEnd('/')
-    private val wsBaseUrl = baseUrl.replaceFirst("http", "ws")
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    // Lido a cada chamada: trocar o servidor nas configurações vale na próxima requisição/conexão.
+    private val baseUrl: String get() = ServerSettings.url(appContext)
+    private val wsBaseUrl: String get() = baseUrl.replaceFirst("http", "ws")
     private val http = OkHttpClient.Builder()
         .pingInterval(20, TimeUnit.SECONDS)
         .build()
@@ -130,6 +133,23 @@ class RelayClient(context: Context) {
         stopped = false
         drops = 0
         io.execute { attempt() }
+    }
+
+    /** Derruba a conexão atual; ela volta sozinha em alguns segundos (com o endereço atual do servidor). */
+    fun reconnect() {
+        socket?.cancel()
+    }
+
+    /** Confere se [url] responde como um servidor do Monitor de Câmera. Bloqueia: chame fora da thread principal. */
+    fun checkServer(url: String): Boolean {
+        val request = Request.Builder().url("$url/api/config").get().build()
+        return try {
+            http.newCall(request).execute().use { response ->
+                response.isSuccessful && JSONObject(response.body!!.string()).has("googleEnabled")
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun stop() {

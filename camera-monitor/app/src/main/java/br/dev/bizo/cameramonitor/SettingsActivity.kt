@@ -8,6 +8,7 @@ import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import br.dev.bizo.cameramonitor.databinding.ActivitySettingsBinding
 import com.google.android.material.snackbar.Snackbar
+import java.util.concurrent.Executors
 
 /**
  * Configurações: imagem, detecção de movimento, PIN e conta.
@@ -17,6 +18,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
     private val relay by lazy { RelayClient(this) }
+    private val io = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +39,12 @@ class SettingsActivity : AppCompatActivity() {
         binding.signOutButton.setOnClickListener {
             relay.signOut()
             finish()
+        }
+        binding.serverButton.setOnClickListener {
+            ServerDialog.show(this, relay, io) {
+                Snackbar.make(binding.root, R.string.server_saved, Snackbar.LENGTH_SHORT).show()
+                refresh()
+            }
         }
     }
 
@@ -64,6 +72,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.pinSetButton.setText(if (pinSet) R.string.pin_change else R.string.pin_set)
         binding.pinRemoveButton.visibility = if (pinSet) View.VISIBLE else View.GONE
 
+        binding.serverText.text = ServerDialog.displayName(ServerSettings.url(this))
         binding.accountText.text = relay.email ?: ""
         // Sair da conta com a câmera ligada deixaria o serviço sem sessão: pede para parar antes.
         binding.signOutButton.isEnabled = !running

@@ -55,6 +55,16 @@
     <string name="motion_sensitivity_label">Sensibilidade</string>
     <string name="motion_on_hint">Guarda uma foto e envia um alerta aos navegadores com alertas ativados no site.</string>
     <string name="motion_off_hint">Desligada: nenhum movimento é registrado.</string>
+    <string name="server_title">Servidor</string>
+    <string name="server_change">Alterar servidor</string>
+    <string name="server_dialog_title">Endereço do servidor</string>
+    <string name="server_hint">Endereço, como camera.exemplo.com</string>
+    <string name="server_helper">Use o mesmo endereço do site. Padrão: %1$s</string>
+    <string name="server_invalid">Digite um endereço https válido, como camera.exemplo.com.</string>
+    <string name="server_unreachable">Esse endereço não respondeu como um servidor do Monitor de Câmera. Confira e tente de novo.</string>
+    <string name="server_default">Usar padrão</string>
+    <string name="server_saved">Servidor alterado.</string>
+    <string name="login_server">Servidor: %1$s</string>
     <string name="account_title">Conta</string>
     <string name="sign_out">Sair da conta neste aparelho</string>
     <string name="sign_out_running_hint">Pare a câmera para sair da conta.</string>
@@ -77,6 +87,7 @@
     <string name="pin_saved">PIN definido.</string>
     <string name="pin_removed">PIN removido.</string>
     <string name="dialog_ok">OK</string>
+    <string name="dialog_save">Salvar</string>
     <string name="dialog_cancel">Cancelar</string>
 
     <!-- Login -->

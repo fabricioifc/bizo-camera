@@ -5,7 +5,7 @@ Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadro
 ## Compilar e instalar
 
 1. Abra a pasta `camera-monitor` no Android Studio.
-2. O endereço do servidor é `https://camera.bizo.dev.br` por padrão. Para usar outro, passe a propriedade `relayUrl` ao Gradle:
+2. O endereço do servidor é `https://camera.bizo.dev.br` por padrão. Ele pode ser trocado no próprio app, sem gerar outro APK: no cartão de login (**Servidor: …**) ou em **Configurações > Servidor**. O app confere se o endereço responde antes de salvar e, com a câmera ligada, reconecta no endereço novo. Para mudar o padrão do build, passe a propriedade `relayUrl` ao Gradle:
    - Linha de comando: `./gradlew assembleRelease -PrelayUrl=https://outro.dominio`
    - Ou, para valer em todos os builds, adicione `relayUrl=https://outro.dominio` em `~/.gradle/gradle.properties` (no Windows, `C:\Users\<usuário>\.gradle\gradle.properties`).
 3. O Client ID do Google (cliente **Aplicativo da Web**, o mesmo `GOOGLE_CLIENT_ID` do servidor) já está em `gradle.properties` como `googleServerClientId`. Para outro valor, use `-PgoogleServerClientId=...` na linha de comando.
