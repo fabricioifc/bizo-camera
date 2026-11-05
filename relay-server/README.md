@@ -6,8 +6,16 @@ Liga a câmera (app Android) aos visualizadores (navegador). Também entrega o s
 
 Requer Docker Desktop (ou Docker Engine + Compose).
 
+Configure as variáveis de ambiente antes de iniciar pela primeira vez:
+
 ```bash
 cd relay-server
+cp .env.example .env
+```
+
+Edite `.env` e ajuste `PUBLIC_URL` para o domínio público do seu servidor (por exemplo, `https://camera.seudominio.com`). Se usar login com Google, informe também `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` e cadastre `https://SEU_DOMINIO/api/auth/google/callback` como URI de redirecionamento no Google Cloud Console. O `.env` é local e não deve ser compartilhado ou enviado ao Git.
+
+```bash
 docker compose up -d --build
 ```
 
@@ -101,14 +109,16 @@ Abra http://localhost:8787 no navegador.
 | `TRUST_PROXY` | (vazio) | Defina `1` atrás de um proxy ou túnel (cloudflared, Caddy, Nginx), para limitar tentativas por IP real. |
 | `GOOGLE_CLIENT_ID` | (vazio) | Cliente OAuth do Google. Sem ele, o botão de login com Google fica desativado. |
 | `GOOGLE_CLIENT_SECRET` | (vazio) | Segredo do cliente OAuth. Nunca versione este valor. |
+| `BACKUP_SCHEDULE` | `0 6 * * *` | Horário diário do backup em UTC, no formato cron. |
+| `BACKUP_KEEP` | `14` | Quantidade de backups a manter. |
 
-No Docker, coloque `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no arquivo `relay-server/.env`. Ele é lido pelo `docker-compose.yml` e está no `.gitignore`.
+No Docker, configure essas variáveis em `relay-server/.env`, criado a partir de `.env.example`. Esse arquivo é carregado pelo Docker Compose e está no `.gitignore`. Para publicar sua própria instância, defina `PUBLIC_URL` com o endereço HTTPS público e configure o túnel ou proxy para encaminhar o tráfego ao relay.
 
 ## Login com Google
 
 1. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crie um cliente OAuth do tipo **Aplicativo da Web**.
 2. Em **URIs de redirecionamento autorizados**, adicione:
-   `https://camera.bizo.dev.br/api/auth/google/callback`
+   `https://SEU_DOMINIO/api/auth/google/callback` (substitua pelo domínio configurado em `PUBLIC_URL`).
 3. Copie o **Client ID** e o **Client secret** para o `.env` e reinicie o relay com `docker compose up -d`.
 
 A conta Google só é vinculada a uma conta existente com o mesmo e-mail quando o Google confirma o e-mail (`email_verified`). Se a conta já tiver verificação em duas etapas, ela continua sendo pedida depois do Google.

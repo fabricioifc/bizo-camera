@@ -6,13 +6,10 @@ services:
       # Publicado só em localhost: o cloudflared acessa daqui, sem exposição direta à internet.
       - "127.0.0.1:8787:8787"
     environment:
-      # Endereço público (usado nos links de retorno do login com Google e no cookie seguro).
-      PUBLIC_URL: https://camera.bizo.dev.br
-      # Atrás do cloudflared, usa o IP real do cliente (X-Forwarded-For) para limitar tentativas.
-      TRUST_PROXY: "1"
-      # Só o primeiro usuário pode se cadastrar. Use "1" temporariamente para criar outra conta.
-      ALLOW_SIGNUP: "0"
-      # Login com Google: deixe vazio para desativar. Os valores podem vir do arquivo .env (fora do git).
+      # Os valores são lidos do .env pelo Docker Compose.
+      PUBLIC_URL: ${PUBLIC_URL:-https://camera.bizo.dev.br}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-0}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
@@ -25,9 +22,9 @@ services:
     entrypoint: ["/bin/sh", "/scripts/backup-cron.sh"]
     environment:
       # Horário no formato do cron, em UTC. "0 6 * * *" = todo dia às 03:00 de Brasília.
-      BACKUP_SCHEDULE: "0 6 * * *"
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 6 * * *}
       # Quantas cópias guardar; as mais antigas são apagadas.
-      BACKUP_KEEP: "14"
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
     volumes:
       - relay-data:/data:ro
       - ./backups:/backups
