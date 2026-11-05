@@ -2,7 +2,8 @@
 
 Uso: python make_icons.py <imagem> <pasta res> <arquivo de prévia> [pasta web do servidor]
 
-Com a pasta web, gera também favicon.ico, icon-192.png e apple-touch-icon.png para o site.
+Com a pasta web, gera também os ícones do site: favicon.ico, icon-192.png, icon-512.png,
+icon-maskable-512.png (instalação como app) e apple-touch-icon.png.
 """
 import os
 import sys
@@ -72,6 +73,12 @@ if web_dir:
     favicon = fit(256, 256)
     favicon.save(os.path.join(web_dir, "favicon.ico"), sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
     fit(192, 192).save(os.path.join(web_dir, "icon-192.png"), optimize=True)
+    fit(512, 512).save(os.path.join(web_dir, "icon-512.png"), optimize=True)
+    # Ícone "mascarável" do app instalado: o sistema recorta (círculo, gota...); o desenho fica
+    # dentro da área segura central (80%) sobre o fundo escuro.
+    maskable = Image.new("RGBA", (512, 512), BACKGROUND)
+    maskable.alpha_composite(fit(512, 368))
+    maskable.convert("RGB").save(os.path.join(web_dir, "icon-maskable-512.png"), optimize=True)
     # O iPhone pinta a transparência de preto; usa o fundo escuro do site com margem.
     apple = Image.new("RGBA", (180, 180), BACKGROUND)
     apple.alpha_composite(fit(180, 156))

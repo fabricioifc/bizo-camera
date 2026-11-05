@@ -2,9 +2,12 @@ export const pushSupported = 'serviceWorker' in navigator && 'PushManager' in wi
 
 let registration = null;
 
-/** Registra o service worker uma vez; resolve com null se não houver suporte ou falhar. */
+/**
+ * Registra o service worker uma vez (alertas e app instalável); resolve com null se não houver
+ * suporte ou falhar.
+ */
 export function serviceWorker() {
-  if (!pushSupported) return Promise.resolve(null);
+  if (!('serviceWorker' in navigator)) return Promise.resolve(null);
   registration ||= navigator.serviceWorker.register('/sw.js').catch(() => null);
   return registration;
 }

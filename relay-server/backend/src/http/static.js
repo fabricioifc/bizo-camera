@@ -10,6 +10,9 @@ const STATIC_FILES = new Map([
   ['/favicon.ico', { file: 'favicon.ico', type: 'image/x-icon' }],
   ['/icon-192.png', { file: 'icon-192.png', type: 'image/png' }],
   ['/apple-touch-icon.png', { file: 'apple-touch-icon.png', type: 'image/png' }],
+  ['/icon-512.png', { file: 'icon-512.png', type: 'image/png' }],
+  ['/icon-maskable-512.png', { file: 'icon-maskable-512.png', type: 'image/png' }],
+  ['/manifest.webmanifest', { file: 'manifest.webmanifest', type: 'application/manifest+json; charset=utf-8' }],
 ]);
 
 const SECURITY_HEADERS = {

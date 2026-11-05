@@ -244,6 +244,12 @@ A tela de uma câmera tem duas abas: **Ao vivo** (imagem e controles) e **Movime
 
 O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valores conhecidos, com no máximo 20 pedidos a cada 10 segundos por visualizador. A câmera aplica, salva no aparelho e responde com o estado atual, que aparece em todos os visualizadores abertos. Precisa da versão do app com controle remoto; com a versão anterior, o cartão fica esperando a câmera.
 
+## Instalar como app
+
+O site é instalável (PWA): no Chrome/Edge do Android, Windows ou macOS, aparece **Instalar app** na barra lateral e em **Configurações > Instalar como app** (ou no menu do navegador). No iPhone, é pelo Safari: **Compartilhar > Adicionar à Tela de Início**; lá, os alertas só funcionam com o site instalado.
+
+Instalado, abre em tela cheia com o ícone da Buba e, sem rede, mostra a última versão da página (com "Sem conexão") em vez de uma página de erro. O service worker (`sw.js`) guarda só a página e os arquivos do build; a API, as fotos e os vídeos sempre vêm do servidor. A instalação exige HTTPS (ou `localhost`).
+
 ## Vídeo do movimento
 
 Com **Gravar vídeo do movimento** ligado (no app ou nos controles do site), a câmera grava cerca de 8 segundos a cada movimento: 1 segundo antes e 7 depois, a 8 quadros por segundo e até 480 px no lado maior, em MP4 (H.264). A foto e a notificação saem na hora; o vídeo chega alguns segundos depois e fica no mesmo evento.

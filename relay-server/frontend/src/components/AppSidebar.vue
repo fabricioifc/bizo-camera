@@ -1,5 +1,6 @@
 <script setup>
 import AppIcon from './AppIcon.vue';
+import { canInstall, install, installed } from '../lib/install.js';
 
 defineProps({
   section: { type: String, required: true },
@@ -41,6 +42,11 @@ const ITEMS = [
     </nav>
 
     <div class="sidebar-footer">
+      <!-- Atalho para instalar, só quando o navegador oferece -->
+      <button v-if="canInstall && !installed" type="button" class="btn btn-secondary btn-block" @click="install">
+        <AppIcon name="download" :size="16" />
+        Instalar app
+      </button>
       <span class="connection">
         <span class="pill" :class="connectionOk ? 'success' : 'danger'">
           {{ connectionOk ? 'Servidor conectado' : 'Sem conexão' }}

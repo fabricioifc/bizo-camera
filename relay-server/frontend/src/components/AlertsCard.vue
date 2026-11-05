@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue';
 import AppIcon from './AppIcon.vue';
 import { errorText, post } from '../lib/api.js';
-import { base64UrlToBytes, serviceWorker } from '../lib/push.js';
+import { base64UrlToBytes, pushSupported, serviceWorker } from '../lib/push.js';
 
 // Alertas de movimento por Web Push neste navegador.
 const registration = ref(null);
@@ -50,7 +50,8 @@ async function toggle() {
 }
 
 onMounted(async () => {
-  registration.value = await serviceWorker();
+  // Sem suporte a notificações (ex.: iPhone fora do app instalado), o cartão avisa.
+  registration.value = pushSupported ? await serviceWorker() : null;
   await refresh().catch(() => {});
   ready.value = true;
 });

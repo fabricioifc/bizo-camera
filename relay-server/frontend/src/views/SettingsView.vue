@@ -1,6 +1,7 @@
 <script setup>
 import AlertsCard from '../components/AlertsCard.vue';
 import AppReleaseCard from '../components/AppReleaseCard.vue';
+import InstallCard from '../components/InstallCard.vue';
 import PageHeader from '../components/PageHeader.vue';
 import ThemeToggle from '../components/ThemeToggle.vue';
 </script>
@@ -11,6 +12,8 @@ import ThemeToggle from '../components/ThemeToggle.vue';
   </PageHeader>
 
   <div class="page-narrow">
+    <InstallCard />
+
     <AlertsCard />
 
     <section class="card" aria-labelledby="theme-title">

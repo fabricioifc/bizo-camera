@@ -199,11 +199,25 @@ describe('arquivos da página', () => {
       ['/favicon.ico', 'image/x-icon'],
       ['/icon-192.png', 'image/png'],
       ['/apple-touch-icon.png', 'image/png'],
+      ['/icon-512.png', 'image/png'],
+      ['/icon-maskable-512.png', 'image/png'],
+      ['/manifest.webmanifest', 'application/manifest+json'],
     ]) {
       const res = await server.call('GET', route, { raw: true });
       assert.equal(res.status, 200, route);
       assert.ok(res.headers.get('content-type').startsWith(type), route);
     }
+  });
+
+  it('manifesto deixa o site instalável', async () => {
+    const res = await server.call('GET', '/manifest.webmanifest', { raw: true });
+    const manifest = JSON.parse(res.data.toString());
+    assert.equal(manifest.display, 'standalone');
+    assert.equal(manifest.start_url, '/');
+    assert.ok(manifest.icons.some((icon) => icon.sizes === '512x512' && icon.purpose === 'maskable'));
+    assert.ok(manifest.icons.some((icon) => icon.sizes === '192x192'));
+    const html = (await server.call('GET', '/')).data.toString();
+    assert.match(html, /<link rel="manifest" href="\/manifest.webmanifest">/);
   });
 
   it('página tem cabeçalhos de segurança', async () => {
