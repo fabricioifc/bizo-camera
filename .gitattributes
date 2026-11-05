@@ -1,0 +1,3 @@
+# Scripts de shell rodam dentro de containers Linux: sempre com fim de linha LF,
+# mesmo em clones no Windows (core.autocrlf=true trocaria por CRLF e o sh falharia).
+*.sh text eol=lf

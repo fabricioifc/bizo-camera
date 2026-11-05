@@ -29,35 +29,41 @@ Para apagar os dados junto com o volume, use `docker compose down -v`. Isso remo
 
 ### Backup
 
-O volume tem tudo o que não dá para recriar: contas, sessões, câmeras, fotos de movimento e as chaves dos alertas (`vapid.json`). Para copiar, rode na máquina onde o servidor roda:
+O volume tem tudo o que não dá para recriar: contas, sessões, câmeras, fotos de movimento e as chaves dos alertas (`vapid.json`). O serviço `backup` do `docker-compose.yml` cuida disso sozinho: sobe junto com o servidor (`docker compose up -d`), faz uma cópia ao iniciar e outra todo dia às 03:00 de Brasília.
+
+- As cópias ficam em `relay-server/backups/relay-data-<data>.tar.gz` (fora do git; a data no nome é em UTC).
+- Guarda as 14 mais recentes. Horário e quantidade ficam em `BACKUP_SCHEDULE` (formato do cron, em UTC) e `BACKUP_KEEP`, no `docker-compose.yml`.
+- O volume é montado só para leitura no serviço de backup, então ele nunca altera os dados.
+- Leve as cópias para fora do computador de vez em quando (pendrive ou nuvem privada).
+
+Comandos:
 
 ```bash
-npm run backup
-```
-
-A cópia vai para `relay-server/backups/relay-data-<data>.tar.gz` (fora do git). O script guarda as 14 mais recentes (`npm run backup -- --keep 30` para mudar). Pode rodar com o servidor ligado. Leve as cópias para fora do computador de vez em quando (pendrive ou nuvem privada).
-
-Para fazer backup todo dia no Windows, crie uma tarefa agendada (ajuste o caminho se o projeto estiver em outro lugar):
-
-```bash
-schtasks /create /tn "Backup Monitor de Camera" /sc daily /st 03:00 /tr "cmd /c cd /d C:\Users\fabri\OneDrive\Documents\projetos\bizo-camera\relay-server && npm run backup"
+docker compose logs backup                      # ver as cópias feitas
+docker compose exec backup sh /scripts/backup.sh  # fazer uma cópia agora
 ```
 
 Para restaurar (apaga os dados atuais do volume):
 
 ```bash
 docker compose stop relay
-npm run restore -- backups/relay-data-<data>.tar.gz --yes
+docker compose run --rm restore /backups/relay-data-<data>.tar.gz
 docker compose up -d
 ```
 
+Sem o nome do arquivo, `docker compose run --rm restore` só lista as cópias disponíveis.
+
 ## Testes
 
+Roda os testes de `tests/` com o executor do próprio Node (`node --test`). Cada arquivo sobe o servidor de verdade numa porta livre, com um banco temporário: login e sessões, 2FA, login com Google (com chave falsa), saúde e movimento das câmeras, permissões das fotos, alertas e arquivos da página.
+
+Num container, sem precisar de Node instalado (PowerShell ou Git Bash, na pasta `relay-server`):
+
 ```bash
-npm test
+docker run --rm -v "${PWD}:/app" -v /app/node_modules -w /app node:20-alpine sh -c "npm ci && npm test"
 ```
 
-Roda os testes de `tests/` com o executor do próprio Node (`node --test`). Cada arquivo sobe o servidor de verdade numa porta livre, com um banco temporário: login e sessões, 2FA, login com Google (com chave falsa), saúde e movimento das câmeras, permissões das fotos, alertas e arquivos da página.
+Com Node instalado, basta `npm test`.
 
 ### Expor pelo cloudflared
 

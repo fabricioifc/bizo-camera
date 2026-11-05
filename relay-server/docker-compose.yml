@@ -18,5 +18,30 @@ services:
     volumes:
       - relay-data:/data
 
+  # Backup do volume de dados: uma cópia ao subir e outra por dia, em ./backups (fora do git).
+  backup:
+    image: alpine:3.20
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/scripts/backup-cron.sh"]
+    environment:
+      # Horário no formato do cron, em UTC. "0 6 * * *" = todo dia às 03:00 de Brasília.
+      BACKUP_SCHEDULE: "0 6 * * *"
+      # Quantas cópias guardar; as mais antigas são apagadas.
+      BACKUP_KEEP: "14"
+    volumes:
+      - relay-data:/data:ro
+      - ./backups:/backups
+      - ./scripts:/scripts:ro
+
+  # Restauração (só roda quando chamada): docker compose run --rm restore /backups/<arquivo>
+  restore:
+    image: alpine:3.20
+    profiles: ["restore"]
+    entrypoint: ["/bin/sh", "/scripts/restore.sh"]
+    volumes:
+      - relay-data:/data
+      - ./backups:/backups:ro
+      - ./scripts:/scripts:ro
+
 volumes:
   relay-data:

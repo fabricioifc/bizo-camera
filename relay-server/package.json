@@ -6,9 +6,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test",
-    "backup": "node scripts/backup.js",
-    "restore": "node scripts/restore.js"
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
