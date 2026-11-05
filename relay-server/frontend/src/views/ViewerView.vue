@@ -95,6 +95,8 @@ function handleMessage(text) {
     if (photo.value?.id === message.event.id) photo.value = message.event;
   } else if (message.type === 'eventRemoved') {
     removeEvent(message.id);
+  } else if (message.type === 'eventsRemoved') {
+    removeEvents(message.ids);
   } else if (message.type === 'motion') {
     events.value.unshift(message.event);
     eventsLoaded.value = true;
@@ -129,6 +131,12 @@ function connect() {
 
 function removeEvent(id) {
   events.value = events.value.filter((item) => item.id !== id);
+}
+
+function removeEvents(ids) {
+  const gone = new Set(ids);
+  events.value = events.value.filter((item) => !gone.has(item.id));
+  if (photo.value && gone.has(photo.value.id)) photo.value = null;
 }
 
 function showTab(next) {
@@ -224,14 +232,20 @@ onBeforeUnmount(() => {
 
   <div v-show="tab === 'events'">
     <div class="events-toolbar">
-      <span class="muted small">Movimentos detectados e fotos tiradas pelo site.</span>
+      <span class="muted small">Movimentos detectados e fotos tiradas pelo site, numa linha do tempo.</span>
       <button type="button" class="btn btn-secondary" :disabled="!online || photoBusy" @click="snap">
         <AppIcon :name="photoBusy ? 'refresh' : 'photo'" :size="16" />
         {{ photoBusy ? 'Tirando foto…' : 'Foto agora' }}
       </button>
     </div>
     <StatusMessage :text="photoError" kind="error" />
-    <MotionEvents :events="events" :loaded="eventsLoaded" @open="photo = $event" />
+    <MotionEvents
+      :device-id="device.id"
+      :events="events"
+      :loaded="eventsLoaded"
+      @open="photo = $event"
+      @removed="removeEvents"
+    />
   </div>
   <EventDialog v-if="photo" :event="photo" :title="device.name" @close="photo = null" @removed="removeEvent" />
 </template>

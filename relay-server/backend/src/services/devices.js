@@ -6,8 +6,10 @@ const { randomHex, safeEqual, sha256 } = require('../lib/crypto');
 const { sanitizeChanges, sanitizeReport } = require('./camera-settings');
 
 const MOTION_COOLDOWN_MS = 30_000; // no máximo um alerta por câmera a cada 30 s
-const MAX_EVENTS_PER_DEVICE = 50;
-const RECENT_EVENTS = 20;
+// Eventos guardados por câmera (a linha do tempo do site mostra todos). Os vídeos ainda têm o
+// limite de espaço total (clipStorageBytes).
+const MAX_EVENTS_PER_DEVICE = 200;
+const MAX_BULK_REMOVE = MAX_EVENTS_PER_DEVICE;
 const MAX_SNAPSHOT_BYTES = 512 * 1024;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024; // "Foto agora", em qualidade alta
 const PHOTO_TIMEOUT_MS = 20_000;
@@ -254,10 +256,10 @@ function createDevices({ store, hub, alerts, releases, snapshotDir, clipStorageB
       return device && secret && safeEqual(sha256(secret), device.secretHash) ? deviceId : null;
     },
 
-    recentEvents(deviceId) {
+    recentEvents(deviceId, limit = MAX_EVENTS_PER_DEVICE) {
       return store.data.events
         .filter((event) => event.deviceId === deviceId)
-        .slice(-RECENT_EVENTS)
+        .slice(-Math.min(Math.max(1, limit), MAX_EVENTS_PER_DEVICE))
         .reverse()
         .map(eventView);
     },
@@ -293,6 +295,22 @@ function createDevices({ store, hub, alerts, releases, snapshotDir, clipStorageB
       store.save();
       hub.notifyViewers(found.event.deviceId, { type: 'eventRemoved', id: eventId });
       return true;
+    },
+
+    /**
+     * Exclusão em lote: remove os eventos [ids] desta câmera (os de outras câmeras são ignorados).
+     * Devolve quantos foram removidos.
+     */
+    removeEvents(deviceId, ids) {
+      const wanted = new Set((Array.isArray(ids) ? ids : []).slice(0, MAX_BULK_REMOVE).filter((id) => ID_PATTERN.test(id)));
+      const removed = store.data.events.filter((event) => event.deviceId === deviceId && wanted.has(event.id));
+      if (!removed.length) return 0;
+      for (const event of removed) removeEventFiles(event);
+      const removedIds = new Set(removed.map((event) => event.id));
+      store.data.events = store.data.events.filter((event) => !removedIds.has(event.id));
+      store.save();
+      hub.notifyViewers(deviceId, { type: 'eventsRemoved', ids: [...removedIds] });
+      return removed.length;
     },
 
     /**

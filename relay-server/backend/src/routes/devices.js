@@ -66,7 +66,17 @@ function deviceRoutes(router, app) {
     const userId = requireFullSession(ctx);
     if (!userId) return;
     if (!devices.owned(userId, ctx.params[0])) return notFound(ctx.res);
-    return sendJson(ctx.res, 200, { events: devices.recentEvents(ctx.params[0]) });
+    const limit = Number(ctx.url.searchParams.get('limit')) || undefined;
+    return sendJson(ctx.res, 200, { events: devices.recentEvents(ctx.params[0], limit) });
+  });
+
+  // Exclusão em lote (ex.: todos os vídeos de um dia): corpo { ids: [...] }.
+  router.delete(DEVICE_EVENTS, async (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    if (!devices.owned(userId, ctx.params[0])) return notFound(ctx.res);
+    const body = await readJson(ctx.req);
+    return sendJson(ctx.res, 200, { removed: devices.removeEvents(ctx.params[0], body.ids) });
   });
 
   // Nome do arquivo baixado: câmera e data/hora do evento.

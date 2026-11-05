@@ -254,9 +254,14 @@ Instalado, abre em tela cheia com o ícone da Buba e, sem rede, mostra a última
 
 Com **Gravar vídeo do movimento** ligado (no app ou nos controles do site), a câmera grava cerca de 8 segundos a cada movimento: 1 segundo antes e 7 depois, a 8 quadros por segundo e até 480 px no lado maior, em MP4 (H.264). A foto e a notificação saem na hora; o vídeo chega alguns segundos depois e fica no mesmo evento.
 
-Na aba **Movimentos**, tocar num evento abre o vídeo (ou a foto), com **Baixar** e **Remover**. O mesmo vale para as fotos do "Foto agora".
+A aba **Movimentos** é uma linha do tempo:
 
-Espaço: além do limite de 50 eventos por câmera, os vídeos de todas as câmeras somam no máximo `CLIP_STORAGE_MB` (padrão 500 MB). Acima disso, os vídeos mais antigos são apagados; o evento e a foto continuam.
+- filtro por tipo: **Tudo**, **Movimentos**, **Vídeos** ou **Fotos**;
+- os dias com registros, com a contagem de cada um; escolhendo um dia, aparece a atividade hora a hora, e tocar numa hora filtra só aquela hora;
+- a lista agrupada por dia; tocar num item abre o vídeo (ou a foto), com **Baixar** e **Remover**;
+- **Excluir N** apaga de uma vez tudo o que o filtro está mostrando (por exemplo, todos os vídeos de ontem), com confirmação.
+
+Espaço: além do limite de 200 eventos por câmera, os vídeos de todas as câmeras somam no máximo `CLIP_STORAGE_MB` (padrão 500 MB). Acima disso, os vídeos mais antigos são apagados; o evento e a foto continuam.
 
 ## Foto agora
 
@@ -275,7 +280,7 @@ O mesmo aviso (tomada, bateria, calor) não se repete em menos de 10 minutos. Ao
 
 ## Alertas de movimento
 
-- O app da câmera detecta movimento e envia um evento com uma foto. O servidor aceita no máximo um alerta por câmera a cada 30 segundos e guarda os 50 eventos mais recentes de cada câmera.
+- O app da câmera detecta movimento e envia um evento com uma foto. O servidor aceita no máximo um alerta por câmera a cada 30 segundos e guarda os 200 eventos mais recentes de cada câmera.
 - As fotos ficam em `snapshots/`, ao lado do banco (no Docker, dentro do volume `relay-data`). Só o dono da câmera consegue abri-las.
 - Para receber notificações, abra **Configurações** no menu e toque em **Ativar** em Alertas de movimento, em cada navegador ou celular onde quer o aviso. O navegador pede permissão.
 - As notificações usam Web Push. As chaves VAPID são geradas na primeira execução e salvas em `vapid.json`, também ao lado do banco. Se esse arquivo for apagado, os alertas precisam ser ativados de novo em cada aparelho.
@@ -296,7 +301,8 @@ O mesmo aviso (tomada, bateria, calor) não se repete em menos de 10 minutos. Ao
 - `GET /api/devices`: lista as câmeras da conta, o status online, a saúde do aparelho, o último movimento, desde quando está offline (`lastSeenAt`) e a versão do app (`app`, com `update` quando há versão publicada mais nova).
 - `PATCH /api/devices/:id`: renomeia uma câmera da conta (nome obrigatório, até 40 caracteres).
 - `DELETE /api/devices/:id`: remove uma câmera, revoga suas credenciais e encerra suas conexões; os eventos e fotos dela também são apagados.
-- `GET /api/devices/:id/events`: últimos 20 eventos da câmera (`kind`: `motion` ou `photo`).
+- `GET /api/devices/:id/events`: eventos da câmera, do mais novo para o mais antigo (até 200; `kind`: `motion` ou `photo`).
+- `DELETE /api/devices/:id/events`: exclusão em lote, com corpo `{ "ids": [...] }`; responde `{ removed }`.
 - `POST /api/devices/:id/photo`: "Foto agora"; espera a câmera e responde com o evento da foto (409 se a câmera estiver offline ou ocupada, 504 se não responder).
 - `GET /api/events/:id/snapshot`: foto de um movimento.
 - `POST /api/app/release`: publica uma versão do app (corpo = o APK). Responde com pacote, versão, tamanho e sha256.
