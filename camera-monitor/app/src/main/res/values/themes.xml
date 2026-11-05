@@ -3,6 +3,13 @@
     <!-- Material 3 com claro/escuro automático, seguindo o sistema. -->
     <style name="Theme.CameraMonitor" parent="Theme.Material3.DayNight.NoActionBar" />
 
+    <!-- Abertura (splash): fundo escuro com o logotipo; depois troca para o tema normal. -->
+    <style name="Theme.CameraMonitor.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.CameraMonitor</item>
+    </style>
+
     <!-- Tela de configurações: título de seção, rótulo de opção e texto de ajuda. -->
     <style name="SettingsSection">
         <item name="android:layout_width">match_parent</item>

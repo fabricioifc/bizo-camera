@@ -23,3 +23,13 @@ Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadro
 - *Configurações > Apps > Monitor de Câmera > Economia de bateria > Sem restrições*.
 - *Segurança > Autoinicialização*: permita o app, se quiser que ele volte após reinício.
 - Mantenha o celular ligado na tomada.
+
+## Ícone e splash
+
+O logotipo original fica em `branding/logo.webp`. Para trocar, substitua a imagem e gere os ícones de novo (precisa de Python com Pillow):
+
+```bash
+python branding/make_icons.py branding/logo.webp app/src/main/res branding/preview.png
+```
+
+O script tira o fundo branco, gera os ícones em todas as densidades (`mipmap-*`) e salva uma prévia do ícone redondo em `branding/preview.png`. A splash usa o mesmo desenho (`ic_launcher_foreground`).
