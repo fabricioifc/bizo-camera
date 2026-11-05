@@ -39,12 +39,6 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 Esse arquivo Compose é independente, desativa a exigência de 2FA, publica a porta `8787` nas interfaces de rede do computador e usa um volume separado (`relay-data-dev`). Também inicia o frontend Vue/Vite em um container separado na porta `5173`. Ele usa `PUBLIC_URL=http://localhost:5173` para que o callback Google passe pelo Vite. Adicione `http://localhost:5173/api/auth/google/callback` às URIs de redirecionamento autorizadas do cliente OAuth local.
 
-Suba o relay e o frontend juntos:
-
-```bash
-docker compose -f docker-compose.dev.yml up -d --build
-```
-
 Abra `http://localhost:5173` para usar a página. O backend e a conexão da câmera continuam na porta `8787`; use `http://IP_DO_COMPUTADOR:8787` no app Android debug. Os dois lados recarregam sozinhos, sem rebuild:
 
 - **frontend/**: o Vite atualiza a página aberta a cada alteração salva.
@@ -70,10 +64,6 @@ docker compose down              # parar (mantém os dados)
 
 Para apagar os dados junto com o volume, use `docker compose down -v`. Isso remove todas as contas.
 
-### Saúde do servidor
-
-`GET /healthz` responde `{ "ok": true }` enquanto o servidor atende. O Dockerfile usa essa rota no `HEALTHCHECK`, a cada 30 segundos, e `docker ps` mostra `healthy` ou `unhealthy`. O Docker sozinho só reinicia o container quando o processo cai (`restart: unless-stopped`); um container que ficar `unhealthy` sem cair precisa de `docker compose restart relay`.
-
 ### Desenvolvimento do frontend sem Docker
 
 Com o backend rodando na 8787 (pelo Compose de desenvolvimento, ou com `npm run dev` em `backend/`, que reinicia a cada alteração):
@@ -86,31 +76,18 @@ npm run dev
 
 Abra `http://localhost:5173`. O Vite encaminha a API, o retorno do login com Google e os WebSockets para a 8787.
 
-### Backup
-
-O volume tem tudo o que não dá para recriar: contas, sessões, câmeras, fotos de movimento e as chaves dos alertas (`vapid.json`). O serviço `backup` do `docker-compose.yml` cuida disso sozinho: sobe junto com o servidor (`docker compose up -d`), faz uma cópia ao iniciar e outra todo dia às 03:00 de Brasília.
-
-- As cópias ficam em `relay-server/backups/relay-data-<data>.tar.gz` (fora do git; a data no nome é em UTC), ou na pasta definida em `BACKUP_DIR`.
-- Guarda as 14 mais recentes. Horário e quantidade ficam em `BACKUP_SCHEDULE` (formato do cron, em UTC) e `BACKUP_KEEP`, no `docker-compose.yml`.
-- O volume é montado só para leitura no serviço de backup, então ele nunca altera os dados.
-- Leve as cópias para fora do computador de vez em quando (pendrive ou nuvem privada).
-
-Comandos:
+## Rodar sem Docker
 
 ```bash
-docker compose logs backup                      # ver as cópias feitas
-docker compose exec backup sh /scripts/backup.sh  # fazer uma cópia agora
+cd relay-server/frontend
+npm install
+npm run build
+cd ../backend
+npm install
+npm start
 ```
 
-Para restaurar (apaga os dados atuais do volume):
-
-```bash
-docker compose stop relay
-docker compose run --rm restore /backups/relay-data-<data>.tar.gz
-docker compose up -d
-```
-
-Sem o nome do arquivo, `docker compose run --rm restore` só lista as cópias disponíveis.
+Abra http://localhost:8787 no navegador.
 
 ## Testes
 
@@ -123,21 +100,6 @@ docker run --rm -v "${PWD}:/app" -v /app/backend/node_modules -v /app/frontend/n
 ```
 
 Com Node instalado: `npm install` em `frontend/` e em `backend/`, depois `npm test` em `backend/`.
-
-### Expor pelo cloudflared
-
-O túnel roda no host e aponta para `http://localhost:8787`. Com o container ativo, o `config.yml` do túnel continua igual ao passo a passo:
-
-```yaml
-ingress:
-  - hostname: camera.bizo.dev.br
-    service: http://localhost:8787
-  - service: http_status:404
-```
-
-### Criar a primeira conta
-
-A primeira conta pode ser criada sem configuração extra. Depois que existir um usuário, o cadastro fica fechado. Para abrir de novo, troque `ALLOW_SIGNUP` para `"1"` em `docker-compose.yml`, rode `docker compose up -d`, cadastre a conta e volte para `"0"`.
 
 ## Organização do código
 
@@ -166,154 +128,8 @@ frontend/
   vite.config.js
 ```
 
-## Rodar sem Docker
+## Mais documentação
 
-```bash
-cd relay-server/frontend
-npm install
-npm run build
-cd ../backend
-npm install
-npm start
-```
-
-Abra http://localhost:8787 no navegador.
-
-## Variáveis de ambiente
-
-| Variável | Padrão | Uso |
-|---|---|---|
-| `PORT` | `8787` | Porta HTTP. |
-| `PUBLIC_URL` | `http://localhost:8787` | Endereço público do site. Usado no retorno do login com Google. Com `https://`, o cookie de sessão vira `Secure`. |
-| `DATA_FILE` | `relay-server/data/db.json` | Arquivo onde ficam usuários, câmeras e sessões. No Docker, é `/data/db.json`. |
-| `ALLOW_SIGNUP` | (vazio) | Defina `1` para permitir novos cadastros além do primeiro usuário. |
-| `TRUST_PROXY` | (vazio) | Defina `1` atrás de um proxy ou túnel (cloudflared, Caddy, Nginx), para limitar tentativas por IP real. |
-| `REQUIRE_2FA` | `1` | Exige verificação em duas etapas no login e antes do acesso às câmeras. No Compose de desenvolvimento fica desativado. |
-| `GOOGLE_CLIENT_ID` | (vazio) | Cliente OAuth do Google. Sem ele, o botão de login com Google fica desativado. |
-| `GOOGLE_CLIENT_SECRET` | (vazio) | Segredo do cliente OAuth. Nunca versione este valor. |
-| `CLIP_STORAGE_MB` | `500` | Espaço total para os vídeos de movimento; acima disso, os mais antigos são apagados. |
-| `OFFLINE_ALERT_MS` | `300000` | Tempo sem conexão até o alerta "Câmera offline" (em milissegundos). |
-| `APP_PACKAGE` | `br.dev.bizo.cameramonitor` | Pacote do app aceito na atualização pelo próprio app. |
-| `WEB_DIR` | `relay-server/frontend/dist` | Pasta da página compilada servida pelo backend. |
-| `BACKUP_SCHEDULE` | `0 6 * * *` | Horário diário do backup em UTC, no formato cron. |
-| `BACKUP_KEEP` | `14` | Quantidade de backups a manter. |
-| `BACKUP_DIR` | `./backups` | Pasta do servidor onde ficam os backups. No Dokploy, use uma pasta fixa (ex.: `/home/fabricio/backups/relay-server`), porque o código é clonado de novo a cada deploy. |
-
-No Docker, configure essas variáveis em `relay-server/.env`, criado a partir de `.env.example`. Esse arquivo é carregado pelo Docker Compose e está no `.gitignore`. Para publicar sua própria instância, defina `PUBLIC_URL` com o endereço HTTPS público e configure o túnel ou proxy para encaminhar o tráfego ao relay.
-
-## Login com Google
-
-1. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crie um cliente OAuth do tipo **Aplicativo da Web**.
-2. Em **URIs de redirecionamento autorizados**, adicione:
-   `https://SEU_DOMINIO/api/auth/google/callback` (substitua pelo domínio configurado em `PUBLIC_URL`).
-3. Copie o **Client ID** e o **Client secret** para o `.env` e reinicie o relay com `docker compose up -d`.
-
-A conta Google só é vinculada a uma conta existente com o mesmo e-mail quando o Google confirma o e-mail (`email_verified`). Se a conta já tiver verificação em duas etapas, ela continua sendo pedida depois do Google.
-
-## Verificação em duas etapas (2FA)
-
-Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda não tiver 2FA, a sessão fica limitada à tela de **Segurança** até você ativá-lo. Nesse caso, as câmeras só aparecem depois.
-
-- Em **Segurança**, na tela da lista de câmeras, ative o 2FA. O servidor mostra um QR code para o app autenticador (Google Authenticator, Authy, 1Password…).
-- Ao confirmar o código, aparecem 8 **códigos de recuperação**. Eles valem uma vez cada e não são mostrados de novo.
-- Com o 2FA ativo, o login pede o código depois da senha. Depois de 5 códigos errados, é preciso entrar com a senha de novo.
-- Para desativar, informe um código (do app ou de recuperação).
-
-## Proteção contra tentativas
-
-- Depois de 5 códigos 2FA errados, a conta fica bloqueada por 15 minutos.
-- Login, cadastro e códigos 2FA têm limite de tentativas por IP, por minuto.
-- Cada código TOTP vale uma vez e códigos de recuperação são apagados depois de usados.
-
-## Atualização do app da câmera
-
-Em **Configurações**, o cartão **Atualização do app da câmera** recebe o APK de release (até 64 MB). O servidor lê o pacote e a versão de dentro do APK, recusa APKs de outros apps e guarda só a última versão em `releases/`, ao lado do banco (no Docker, dentro do volume, então entra no backup).
-
-Os celulares com o app procuram versão nova ao abrir o app, ao abrir a aba Ajustes e, com a câmera ligada, a cada 6 horas (com notificação). A instalação é feita pelo instalador do Android, que pede confirmação. O APK precisa ser assinado com a mesma chave do app instalado; senão, o Android recusa.
-
-Cada câmera informa a versão do app junto com a saúde do aparelho. A lista de câmeras mostra a versão de cada celular (mesmo offline) e o aviso **Atualização pendente** quando há uma versão publicada mais nova do mesmo pacote. Câmeras com app anterior a este recurso aparecem sem versão até serem atualizadas.
-
-`APP_PACKAGE` define o pacote aceito (padrão `br.dev.bizo.cameramonitor`). O Compose de desenvolvimento aceita o build debug (`br.dev.bizo.cameramonitor.debug`).
-
-## Controle remoto
-
-A tela de uma câmera tem duas abas: **Ao vivo** (imagem e controles) e **Movimentos** (fotos dos últimos movimentos, com um contador dos que chegaram enquanto a aba estava fechada). Na aba Ao vivo, o cartão **Controles** muda, sem tocar no celular:
-
-- câmera (traseira ou frontal), rotação extra (−90°, 0°, 90° ou 180°) e qualidade. A imagem já sai na posição do celular (em pé ou deitado), lida pelo sensor; a rotação extra é só para casos em que o sensor não ajuda, como o celular deitado de costas ou preso no teto;
-- lanterna (só em lentes com flash; a frontal normalmente não tem);
-- detecção de movimento e sensibilidade.
-
-O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valores conhecidos, com no máximo 20 pedidos a cada 10 segundos por visualizador. A câmera aplica, salva no aparelho e responde com o estado atual, que aparece em todos os visualizadores abertos. Precisa da versão do app com controle remoto; com a versão anterior, o cartão fica esperando a câmera.
-
-## Instalar como app
-
-O site é instalável (PWA): no Chrome/Edge do Android, Windows ou macOS, aparece **Instalar app** na barra lateral e em **Configurações > Instalar como app** (ou no menu do navegador). No iPhone, é pelo Safari: **Compartilhar > Adicionar à Tela de Início**; lá, os alertas só funcionam com o site instalado.
-
-Instalado, abre em tela cheia com o ícone da Buba e, sem rede, mostra a última versão da página (com "Sem conexão") em vez de uma página de erro. O service worker (`sw.js`) guarda só a página e os arquivos do build; a API, as fotos e os vídeos sempre vêm do servidor. A instalação exige HTTPS (ou `localhost`).
-
-## Vídeo do movimento
-
-Com **Gravar vídeo do movimento** ligado (no app ou nos controles do site), a câmera grava cerca de 8 segundos a cada movimento: 1 segundo antes e 7 depois, a 8 quadros por segundo e até 480 px no lado maior, em MP4 (H.264). A foto e a notificação saem na hora; o vídeo chega alguns segundos depois e fica no mesmo evento.
-
-A aba **Movimentos** é uma linha do tempo:
-
-- filtro por tipo: **Tudo**, **Movimentos**, **Vídeos** ou **Fotos**;
-- os dias com registros, com a contagem de cada um; escolhendo um dia, aparece a atividade hora a hora, e tocar numa hora filtra só aquela hora;
-- a lista agrupada por dia; tocar num item abre o vídeo (ou a foto), com **Baixar** e **Remover**;
-- **Excluir N** apaga de uma vez tudo o que o filtro está mostrando (por exemplo, todos os vídeos de ontem), com confirmação.
-
-Espaço: além do limite de 200 eventos por câmera, os vídeos de todas as câmeras somam no máximo `CLIP_STORAGE_MB` (padrão 500 MB). Acima disso, os vídeos mais antigos são apagados; o evento e a foto continuam.
-
-## Foto agora
-
-O botão de câmera ao lado de **Assistir**, na lista, e **Foto agora**, na aba Movimentos, pedem à câmera uma foto em qualidade alta (até 1920 px no lado maior), sem abrir o vídeo. A foto aparece numa janela e fica guardada em Movimentos com a etiqueta **Foto**, sem gerar alerta e sem contar como último movimento. Uma foto por vez por câmera; a câmera tem 20 segundos para responder (apps anteriores a este recurso não respondem).
-
-## Alertas da câmera
-
-Além do movimento, o servidor avisa pela mesma notificação do navegador (ative em **Configurações > Alertas**, em cada aparelho):
-
-- **Câmera offline:** sem conexão por 5 minutos (`OFFLINE_ALERT_MS`); quedas rápidas de Wi-Fi não contam. Quando ela volta, chega "Câmera de volta".
-- **Fora da tomada:** o celular parou de carregar.
-- **Bateria baixa:** 20% ou menos, sem carregar. Avisa de novo só depois de recarregar.
-- **Esquentando:** o app reduziu a qualidade por causa do calor.
-
-O mesmo aviso (tomada, bateria, calor) não se repete em menos de 10 minutos. Ao subir, o servidor dá 5 minutos para as câmeras vistas nas últimas 24 horas reconectarem; se não voltarem, avisa. A lista de câmeras mostra desde quando cada câmera está offline.
-
-## Alertas de movimento
-
-- O app da câmera detecta movimento e envia um evento com uma foto. O servidor aceita no máximo um alerta por câmera a cada 30 segundos e guarda os 200 eventos mais recentes de cada câmera.
-- As fotos ficam em `snapshots/`, ao lado do banco (no Docker, dentro do volume `relay-data`). Só o dono da câmera consegue abri-las.
-- Para receber notificações, abra **Configurações** no menu e toque em **Ativar** em Alertas de movimento, em cada navegador ou celular onde quer o aviso. O navegador pede permissão.
-- As notificações usam Web Push. As chaves VAPID são geradas na primeira execução e salvas em `vapid.json`, também ao lado do banco. Se esse arquivo for apagado, os alertas precisam ser ativados de novo em cada aparelho.
-- No iPhone, as notificações só funcionam com o site adicionado à tela de início (iOS 16.4 ou mais novo).
-
-## Endpoints
-
-- `GET /api/config`: diz se o cadastro está aberto (`signupOpen`) e se o Google está ativo (`googleEnabled`).
-- `POST /api/auth/mfa`: segunda etapa do login pelo Google, com `mfaToken` e `code` (app ou recuperação).
-- `POST /api/auth/logout`: encerra a sessão.
-- `GET /api/auth/me`: dados da conta logada (`email`, `google`, `twoFactor`, `pending`).
-- `GET /api/auth/google/start` e `GET /api/auth/google/callback`: fluxo do login com Google pela web.
-- `POST /api/auth/google/app`: login do app Android. Recebe o `idToken` do Google e responde `{ token, email, pending }`, ou `{ mfaRequired, mfaToken }` se a conta tiver 2FA. Sem 2FA ativo, `pending: true` e o app precisa configurar o 2FA com o token antes de usar as câmeras.
-- `POST /api/account/2fa/setup`: gera o segredo do 2FA e o QR code.
-- `POST /api/account/2fa/enable`: confirma o código e devolve os códigos de recuperação.
-- `POST /api/account/2fa/disable`: desativa o 2FA com senha (se houver) e um código.
-- `POST /api/devices/register`: a câmera, logada na conta, se registra e recebe `deviceId` e `deviceSecret`.
-- `GET /api/devices`: lista as câmeras da conta, o status online, a saúde do aparelho, o último movimento, desde quando está offline (`lastSeenAt`) e a versão do app (`app`, com `update` quando há versão publicada mais nova).
-- `PATCH /api/devices/:id`: renomeia uma câmera da conta (nome obrigatório, até 40 caracteres).
-- `DELETE /api/devices/:id`: remove uma câmera, revoga suas credenciais e encerra suas conexões; os eventos e fotos dela também são apagados.
-- `GET /api/devices/:id/events`: eventos da câmera, do mais novo para o mais antigo (até 200; `kind`: `motion` ou `photo`).
-- `DELETE /api/devices/:id/events`: exclusão em lote, com corpo `{ "ids": [...] }`; responde `{ removed }`.
-- `POST /api/devices/:id/photo`: "Foto agora"; espera a câmera e responde com o evento da foto (409 se a câmera estiver offline ou ocupada, 504 se não responder).
-- `GET /api/events/:id/snapshot`: foto de um movimento.
-- `POST /api/app/release`: publica uma versão do app (corpo = o APK). Responde com pacote, versão, tamanho e sha256.
-- `GET /api/app/latest`: versão publicada (`packageName`, `versionCode`, `versionName`, `size`, `sha256`), ou 404.
-- `GET /api/app/download`: o APK publicado.
-- `GET /api/events/:id/clip`: vídeo do movimento (MP4, aceita `Range`). Com `?download=1`, vem como arquivo para baixar; o mesmo vale para `/snapshot`.
-- `DELETE /api/events/:id`: remove o evento, com foto e vídeo.
-- `GET /api/push/key`: chave pública VAPID para assinar as notificações.
-- `POST /api/push/subscribe` e `POST /api/push/unsubscribe`: ativa ou desativa os alertas neste navegador.
-- `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`. Além dos quadros, recebe mensagens `health`, `motion` e `settings` (estado atual das configurações) e envia à câmera `start`, `stop` e `configure` (mudanças pedidas pelo site).
-- `WS /ws/view?device=...`: conexão do visualizador da conta, que recebe os quadros JPEG, a saúde, as configurações e os movimentos ao vivo, e envia `configure` para o controle remoto. Usa o cookie de sessão.
-
-A sessão da web fica num cookie `HttpOnly`, então o JavaScript da página não consegue lê-la. O app Android usa o token do corpo da resposta, no cabeçalho `Authorization: Bearer`.
+- [Implantação e operação](../docs/implantacao.md): variáveis de ambiente, túnel, Dokploy, backup, login com Google e 2FA.
+- [Funcionalidades](../docs/funcionalidades.md): controle remoto, vídeo, alertas, atualização do app e instalação do site.
+- [API](../docs/api.md): rotas HTTP e WebSocket.

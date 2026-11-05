@@ -15,7 +15,7 @@ Roda no celular que será a câmera. Faz a captura com CameraX e envia os quadro
 
 ## Testes
 
-Os testes de unidade (detecção de movimento, limite por calor e formato do PIN) rodam no computador, sem celular:
+Os testes de unidade (detecção de movimento, limite por calor, PIN, zoom, modo noturno e outros) rodam no computador, sem celular:
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -45,7 +45,7 @@ A versão aparece no fim da aba **Ajustes** (por exemplo, "versão 0.3.0 (17)").
 
 - `MainActivity`: tela única. Sem conta, mostra o login; com conta, a barra do topo e a navegação inferior com três abas. Pede o PIN para abrir as abas Câmera e Ajustes.
 - `HomeFragment` (aba **Início**): status, prévia, iniciar/parar, aviso de bateria e resumo dos ajustes com atalhos.
-- `CameraFragment` (aba **Câmera**): lente, qualidade e detecção de movimento.
+- `CameraFragment` (aba **Câmera**): lente, zoom, qualidade, rotação, lanterna, modo noturno e detecção de movimento.
 - `SettingsFragment` (aba **Ajustes**): tema, PIN, servidor, conta e versão.
 - `LoginController`: login com Google, código 2FA, configuração do 2FA e códigos de recuperação.
 - `CameraStarter`: registra o aparelho e liga ou desliga o serviço da câmera.
@@ -54,6 +54,8 @@ A versão aparece no fim da aba **Ajustes** (por exemplo, "versão 0.3.0 (17)").
 - `ClipRecorder`, `ClipFrames`: vídeo curto do movimento (guarda 1 s antes, grava 7 s depois, codifica em MP4/H.264 com o encoder do celular).
 - `AppTheme`, `CameraMonitorApp`: tema do sistema, claro ou escuro, aplicado ao abrir o app. As cores ficam em `res/values/colors.xml` (claro) e `res/values-night/colors.xml` (escuro).
 - `StreamService`: serviço em primeiro plano que mantém a câmera e a conexão.
+- `CameraZoom`, `ZoomMath`: escolhem a câmera e o zoom (abaixo de 1×, a grande-angular, se o celular liberar).
+- `NightMode`, `NightScreen`: contas de exposição do modo noturno e a tela preta.
 - `MotionDetector`, `ThermalLimit`, `DeviceHealth`, `FrameConversion`: peças usadas pelo serviço.
 - `RelayClient`: login na API e conexão com o servidor.
 - `CameraSettings`, `PinLock`, `PinDialogs`, `BootReceiver`: configurações, PIN e retomada após reiniciar.
@@ -64,7 +66,7 @@ A versão aparece no fim da aba **Ajustes** (por exemplo, "versão 0.3.0 (17)").
 2. Na aba **Início**, toque em **Iniciar câmera**, concedendo as permissões.
 3. Abra o endereço do servidor no navegador do outro celular ou computador e entre com a mesma conta para assistir.
 
-A aba **Câmera** muda lente, qualidade, rotação extra (a imagem já acompanha a posição do celular, em pé ou deitado; a rotação extra é para ajustes finos), lanterna e detecção de movimento (vale na hora, mesmo transmitindo). As mesmas opções podem ser mudadas pelo site, na tela da câmera ao vivo (controle remoto); a aba acompanha as mudanças. A aba **Ajustes** tem o tema (sistema, claro ou escuro), o PIN, o servidor e a conta.
+A aba **Câmera** muda lente, zoom, qualidade, rotação extra (a imagem já acompanha a posição do celular, em pé ou deitado; a rotação extra é para ajustes finos), lanterna, [modo noturno](../docs/funcionalidades.md#modo-noturno) e detecção de movimento (vale na hora, mesmo transmitindo). As mesmas opções podem ser mudadas pelo site, na tela da câmera ao vivo (controle remoto); a aba acompanha as mudanças. A aba **Ajustes** tem o tema (sistema, claro ou escuro), o PIN, o servidor e a conta.
 
 ## Configurações no Xiaomi Mi A3 (MIUI)
 
