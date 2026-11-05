@@ -295,15 +295,16 @@ class StreamService : LifecycleService() {
             RelayClient.streaming -> R.string.notif_live
             else -> R.string.notif_ready
         }
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentTitle(getString(R.string.notif_title))
             .setContentText(getString(status))
             .setContentIntent(openAppIntent())
-            .addAction(0, getString(R.string.notif_stop), stop)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .build()
+        // Com PIN, só dá para parar pelo app, que pede o PIN.
+        if (!PinLock.isSet(this)) builder.addAction(0, getString(R.string.notif_stop), stop)
+        return builder.build()
     }
 
     // Aviso para retomar: ao abrir o app, a câmera volta a transmitir sozinha.

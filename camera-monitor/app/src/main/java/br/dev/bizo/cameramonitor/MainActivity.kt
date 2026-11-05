@@ -14,8 +14,12 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.util.Base64
 import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
@@ -27,9 +31,12 @@ import androidx.credentials.GetCredentialRequest
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import br.dev.bizo.cameramonitor.databinding.ActivityMainBinding
+import br.dev.bizo.cameramonitor.databinding.DialogPinBinding
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
@@ -84,7 +91,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.toggleButton.setOnClickListener {
             statusNotice = null
-            if (StreamService.isRunning) stopStreaming() else requestPermissionsAndStart()
+            if (StreamService.isRunning) requirePin { stopStreaming() } else requestPermissionsAndStart()
         }
         binding.loginButton.setOnClickListener { onLoginButtonClicked() }
         binding.codeInput.setOnEditorActionListener { _, actionId, _ ->
@@ -96,9 +103,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.signOutButton.setOnClickListener {
-            relay.signOut()
-            showStep(Step.SIGN_IN)
-            refresh()
+            requirePin {
+                relay.signOut()
+                showStep(Step.SIGN_IN)
+                refresh()
+            }
+        }
+        binding.pinSetButton.setOnClickListener {
+            if (PinLock.isSet(this)) requirePin { chooseNewPin() } else chooseNewPin()
+        }
+        binding.pinRemoveButton.setOnClickListener {
+            requirePin {
+                PinLock.clear(this)
+                pinChanged(R.string.pin_removed)
+            }
         }
         binding.batteryButton.setOnClickListener { requestBatteryExemption() }
         binding.previewPermissionButton.setOnClickListener {
@@ -378,6 +396,17 @@ class MainActivity : AppCompatActivity() {
         binding.loginPanel.visibility = visibleIf(!signedIn)
         binding.signOutButton.visibility = visibleIf(signedIn && !running)
         binding.imageCard.visibility = visibleIf(signedIn)
+        // Com PIN, a imagem não muda durante a transmissão (trocar para a frontal "cegaria" a câmera).
+        val imageLocked = running && PinLock.isSet(this)
+        setGroupEnabled(binding.lensGroup, !imageLocked)
+        setGroupEnabled(binding.qualityGroup, !imageLocked)
+        if (imageLocked) binding.qualityHint.setText(R.string.image_locked_hint) else updateQualityHint()
+
+        val pinSet = PinLock.isSet(this)
+        binding.protectionCard.visibility = visibleIf(signedIn)
+        binding.protectionStatus.setText(if (pinSet) R.string.protection_on else R.string.protection_off)
+        binding.pinSetButton.setText(if (pinSet) R.string.pin_change else R.string.pin_set)
+        binding.pinRemoveButton.visibility = visibleIf(pinSet)
         updatePreview()
     }
 
@@ -468,6 +497,83 @@ class MainActivity : AppCompatActivity() {
         preview = null
         val providerFuture = ProcessCameraProvider.getInstance(this)
         providerFuture.addListener({ providerFuture.get().unbind(current) }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun setGroupEnabled(group: ViewGroup, enabled: Boolean) {
+        group.isEnabled = enabled
+        for (i in 0 until group.childCount) group.getChildAt(i).isEnabled = enabled
+    }
+
+    // ----- PIN -----
+
+    /** Executa a ação direto se não houver PIN; senão, pede o PIN antes. */
+    private fun requirePin(action: () -> Unit) {
+        if (!PinLock.isSet(this)) {
+            action()
+            return
+        }
+        promptPin(R.string.pin_current_title, ::checkPin) { action() }
+    }
+
+    private fun checkPin(pin: String): String? = when (PinLock.check(this, pin)) {
+        PinLock.Result.OK -> null
+        PinLock.Result.WRONG -> getString(R.string.pin_wrong)
+        PinLock.Result.LOCKED -> getString(R.string.pin_locked, ((PinLock.lockedForMs(this) + 999) / 1000).toInt())
+    }
+
+    private fun chooseNewPin() {
+        val validFormat = { pin: String -> if (PinLock.isValidFormat(pin)) null else getString(R.string.pin_invalid) }
+        promptPin(R.string.pin_new_title, validFormat) { first ->
+            val matches = { pin: String -> if (pin == first) null else getString(R.string.pin_mismatch) }
+            promptPin(R.string.pin_confirm_title, matches) { pin ->
+                PinLock.set(this, pin)
+                pinChanged(R.string.pin_saved)
+            }
+        }
+    }
+
+    private fun pinChanged(@StringRes message: Int) {
+        Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
+        // Atualiza a notificação (com ou sem o botão Parar) se a câmera estiver ligada.
+        if (StreamService.isRunning) startService(Intent(this, StreamService::class.java))
+        refresh()
+    }
+
+    /** Caixa de PIN. [validate] devolve a mensagem de erro, ou null se o PIN foi aceito. */
+    private fun promptPin(@StringRes title: Int, validate: (String) -> String?, onAccepted: (String) -> Unit) {
+        val view = DialogPinBinding.inflate(layoutInflater)
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setView(view.root)
+            .setPositiveButton(R.string.dialog_ok, null)
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .create()
+        val submit = {
+            val pin = view.pinInput.text?.toString().orEmpty()
+            val error = validate(pin)
+            if (error == null) {
+                dialog.dismiss()
+                onAccepted(pin)
+            } else {
+                view.pinLayout.error = error
+                view.pinInput.text?.clear()
+            }
+        }
+        view.pinInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submit()
+                true
+            } else {
+                false
+            }
+        }
+        // Botão OK sem fechar a caixa sozinho, para mostrar o erro e deixar tentar de novo.
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { submit() }
+            view.pinInput.requestFocus()
+        }
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        dialog.show()
     }
 
     private fun formatDuration(ms: Long): String {

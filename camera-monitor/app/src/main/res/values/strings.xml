@@ -45,6 +45,28 @@
     <string name="quality_medium_hint">640×480, cerca de 10 quadros por segundo. Bom equilíbrio.</string>
     <string name="quality_high_hint">1280×720, cerca de 10 quadros por segundo. Use com Wi-Fi bom.</string>
 
+    <string name="image_locked_hint">Pare a câmera para mudar a imagem.</string>
+
+    <!-- Proteção por PIN -->
+    <string name="protection_title">Proteção</string>
+    <string name="protection_off">Sem PIN, qualquer pessoa com acesso ao celular pode parar a câmera.</string>
+    <string name="protection_on">PIN ativo. Ele é pedido para parar a câmera, sair da conta e mudar a imagem durante a transmissão.</string>
+    <string name="pin_set">Definir PIN</string>
+    <string name="pin_change">Alterar PIN</string>
+    <string name="pin_remove">Remover PIN</string>
+    <string name="pin_hint">PIN (4 a 8 números)</string>
+    <string name="pin_new_title">Novo PIN</string>
+    <string name="pin_confirm_title">Confirme o PIN</string>
+    <string name="pin_current_title">Digite o PIN</string>
+    <string name="pin_invalid">Use de 4 a 8 números.</string>
+    <string name="pin_mismatch">Os PINs não são iguais.</string>
+    <string name="pin_wrong">PIN incorreto.</string>
+    <string name="pin_locked">Muitas tentativas. Tente de novo em %1$d s.</string>
+    <string name="pin_saved">PIN definido.</string>
+    <string name="pin_removed">PIN removido.</string>
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_cancel">Cancelar</string>
+
     <!-- Economia de bateria -->
     <string name="battery_title">Deixe a câmera funcionar em segundo plano</string>
     <string name="battery_detail">Com a economia de bateria ativa, o Android pode encerrar a transmissão com a tela apagada.</string>
