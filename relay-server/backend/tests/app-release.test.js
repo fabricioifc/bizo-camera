@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const { describe, it, before, after } = require('node:test');
 const { readApkInfo } = require('../src/lib/apk');
 const { makeApk } = require('./apk-fixture');
-const { startServer, seedAccount } = require('./helpers');
+const { startServer, seedAccount, wait } = require('./helpers');
 
 describe('leitura do APK', () => {
   it('lê pacote, código e nome da versão', () => {
@@ -75,5 +75,60 @@ describe('atualização do app', () => {
     assert.equal(download.status, 200);
     assert.equal(download.headers.get('content-type'), 'application/vnd.android.package-archive');
     assert.ok(download.data.equals(apk));
+  });
+});
+
+describe('versão do app em cada câmera', () => {
+  let server;
+  let account;
+  let camera;
+
+  before(async () => {
+    account = seedAccount();
+    server = await startServer({ seed: account.db });
+    camera = await server.open(`/ws/device?id=${account.deviceId}`, { Authorization: `Bearer ${account.deviceSecret}` });
+  });
+  after(async () => {
+    camera.close();
+    await server.stop();
+  });
+
+  const device = async () => (await server.call('GET', '/api/devices', { token: account.session })).data.devices[0];
+  const sendVersion = async (code, name = '0.3.1', pkg = 'br.dev.bizo.cameramonitor') => {
+    camera.send(JSON.stringify({ type: 'health', battery: 90, charging: true, appVersionCode: code, appVersionName: name, appPackage: pkg }));
+    await wait(150);
+  };
+  const publish = (apk) => fetch(`${server.base}/api/app/release`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${account.session}` },
+    body: apk,
+  });
+
+  it('câmera sem versão informada (app antigo) aparece sem versão', async () => {
+    assert.equal((await device()).app, null);
+  });
+
+  it('mostra a versão e, sem versão publicada mais nova, nenhuma atualização', async () => {
+    await sendVersion(40);
+    assert.deepEqual((await device()).app, { versionCode: 40, versionName: '0.3.1', update: null });
+  });
+
+  it('marca atualização pendente quando há versão publicada mais nova do mesmo pacote', async () => {
+    assert.equal((await publish(makeApk({ versionCode: 45, versionName: '0.4.0' }))).status, 201);
+    assert.deepEqual((await device()).app.update, { versionCode: 45, versionName: '0.4.0' });
+  });
+
+  it('build de outro pacote (debug) não é comparado com o release', async () => {
+    await sendVersion(10, '0.1.0', 'br.dev.bizo.cameramonitor.debug');
+    assert.equal((await device()).app.update, null);
+  });
+
+  it('a versão continua aparecendo com a câmera offline', async () => {
+    await sendVersion(45, '0.4.0');
+    camera.close();
+    await wait(150);
+    const offline = await device();
+    assert.equal(offline.online, false);
+    assert.deepEqual(offline.app, { versionCode: 45, versionName: '0.4.0', update: null });
   });
 });

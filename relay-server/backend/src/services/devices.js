@@ -37,7 +37,15 @@ function parseHealth(message) {
 }
 
 /** Câmeras da conta, seus movimentos e as fotos de cada movimento. */
-function createDevices({ store, hub, alerts, snapshotDir }) {
+// Versão do app informada pela câmera (junto com a saúde). Câmeras com app antigo não mandam.
+function parseAppVersion(message) {
+  const code = Number(message.appVersionCode);
+  if (!Number.isInteger(code) || code <= 0 || code > 1e9) return null;
+  const text = (value) => (typeof value === 'string' && value.length <= 64 ? value : null);
+  return { code, name: text(message.appVersionName) || String(code), package: text(message.appPackage) };
+}
+
+function createDevices({ store, hub, alerts, releases, snapshotDir }) {
   const lastMotionAt = new Map(); // deviceId -> momento do último alerta
   const snapshotPath = (eventId) => path.join(snapshotDir, `${eventId}.jpg`);
 
@@ -76,6 +84,29 @@ function createDevices({ store, hub, alerts, snapshotDir }) {
     if (device) alerts.notifyMotion(deviceId, device, event).catch(() => {});
   }
 
+  // Versão do app da câmera e a atualização disponível (versão publicada mais nova, do mesmo pacote).
+  function appView(device) {
+    if (!device.app) return null;
+    const latest = releases?.latest();
+    const pending = Boolean(latest && latest.packageName === device.app.package && latest.versionCode > device.app.code);
+    return {
+      versionCode: device.app.code,
+      versionName: device.app.name,
+      update: pending ? { versionCode: latest.versionCode, versionName: latest.versionName } : null,
+    };
+  }
+
+  // Guarda a versão do app (só quando muda), para ela continuar aparecendo com a câmera offline.
+  function rememberAppVersion(deviceId, message) {
+    const device = store.data.devices[deviceId];
+    const app = parseAppVersion(message);
+    if (!device || !app) return;
+    const known = device.app;
+    if (known && known.code === app.code && known.name === app.name && known.package === app.package) return;
+    device.app = app;
+    store.save();
+  }
+
   function view(id) {
     const device = store.data.devices[id];
     const online = hub.isOnline(id);
@@ -88,6 +119,7 @@ function createDevices({ store, hub, alerts, snapshotDir }) {
       lastMotionAt: lastEvent ? lastEvent.at : null,
       // Última conexão ou desconexão: com a câmera offline, mostra desde quando.
       lastSeenAt: device.lastSeenAt || null,
+      app: appView(device),
     };
   }
 
@@ -162,7 +194,10 @@ function createDevices({ store, hub, alerts, snapshotDir }) {
     /** Mensagens de texto da câmera: saúde do aparelho, movimento e configurações atuais. */
     handleMessage(deviceId, data) {
       const message = parseJson(data);
-      if (message?.type === 'health') hub.setHealth(deviceId, parseHealth(message));
+      if (message?.type === 'health') {
+        rememberAppVersion(deviceId, message);
+        hub.setHealth(deviceId, parseHealth(message));
+      }
       else if (message?.type === 'motion') recordMotion(deviceId, message);
       else if (message?.type === 'settings') hub.setSettings(deviceId, sanitizeReport(message.settings));
     },

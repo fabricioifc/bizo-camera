@@ -31,6 +31,7 @@ function createApp(config) {
   const hub = createHub();
   const accounts = createAccounts({ store, allowSignup: config.allowSignup, issuer: config.issuer });
   const alerts = createAlerts({ store, push });
+  const releases = createReleases({ dataDir: config.dataDir, appPackage: config.appPackage });
   const app = {
     config,
     store,
@@ -39,9 +40,9 @@ function createApp(config) {
     alerts,
     sessions: createSessions({ store, secureCookies: config.secureCookies }),
     mfa: createMfaChallenges({ accounts }),
-    devices: createDevices({ store, hub, alerts, snapshotDir: config.snapshotDir }),
+    releases,
+    devices: createDevices({ store, hub, alerts, releases, snapshotDir: config.snapshotDir }),
     rateLimit: createRateLimiter({ trustProxy: config.trustProxy }),
-    releases: createReleases({ dataDir: config.dataDir, appPackage: config.appPackage }),
   };
 
   // Alertas de câmera offline, fora da tomada, bateria baixa e calor.

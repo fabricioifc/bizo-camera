@@ -86,6 +86,16 @@ function remove() {
         <AppIcon name="motion" :size="16" />
         {{ device.lastMotionAt ? `Último movimento ${formatWhen(device.lastMotionAt)}` : 'Nenhum movimento registrado' }}
       </span>
+      <!-- Versão do app no celular; aviso quando há versão publicada mais nova -->
+      <span v-if="device.app" class="device-meta muted">
+        <AppIcon name="refresh" :size="16" />
+        App {{ device.app.versionName }}
+        <span
+          v-if="device.app.update"
+          class="pill warning plain"
+          :title="`Versão ${device.app.update.versionName} publicada. O celular avisa e instala com um toque; abra o app ou aguarde a notificação.`"
+        >Atualização pendente: {{ device.app.update.versionName }}</span>
+      </span>
       <span v-if="!device.online && device.lastSeenAt" class="device-meta muted">
         <AppIcon name="alert" :size="16" />
         Offline desde {{ formatWhen(device.lastSeenAt) }}

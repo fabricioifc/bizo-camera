@@ -229,6 +229,8 @@ Em **Configurações**, o cartão **Atualização do app da câmera** recebe o A
 
 Os celulares com o app procuram versão nova ao abrir o app, ao abrir a aba Ajustes e, com a câmera ligada, a cada 6 horas (com notificação). A instalação é feita pelo instalador do Android, que pede confirmação. O APK precisa ser assinado com a mesma chave do app instalado; senão, o Android recusa.
 
+Cada câmera informa a versão do app junto com a saúde do aparelho. A lista de câmeras mostra a versão de cada celular (mesmo offline) e o aviso **Atualização pendente** quando há uma versão publicada mais nova do mesmo pacote. Câmeras com app anterior a este recurso aparecem sem versão até serem atualizadas.
+
 `APP_PACKAGE` define o pacote aceito (padrão `br.dev.bizo.cameramonitor`). O Compose de desenvolvimento aceita o build debug (`br.dev.bizo.cameramonitor.debug`).
 
 ## Controle remoto
@@ -272,7 +274,7 @@ O mesmo aviso (tomada, bateria, calor) não se repete em menos de 10 minutos. Ao
 - `POST /api/account/2fa/enable`: confirma o código e devolve os códigos de recuperação.
 - `POST /api/account/2fa/disable`: desativa o 2FA com senha (se houver) e um código.
 - `POST /api/devices/register`: a câmera, logada na conta, se registra e recebe `deviceId` e `deviceSecret`.
-- `GET /api/devices`: lista as câmeras da conta, o status online, a saúde do aparelho e o último movimento.
+- `GET /api/devices`: lista as câmeras da conta, o status online, a saúde do aparelho, o último movimento, desde quando está offline (`lastSeenAt`) e a versão do app (`app`, com `update` quando há versão publicada mais nova).
 - `PATCH /api/devices/:id`: renomeia uma câmera da conta (nome obrigatório, até 40 caracteres).
 - `DELETE /api/devices/:id`: remove uma câmera, revoga suas credenciais e encerra suas conexões; os eventos e fotos dela também são apagados.
 - `GET /api/devices/:id/events`: últimos 20 movimentos da câmera.

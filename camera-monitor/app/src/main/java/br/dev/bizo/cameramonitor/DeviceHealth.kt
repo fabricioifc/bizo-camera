@@ -13,12 +13,15 @@ data class DeviceHealth(
     val charging: Boolean,
     val temperatureCelsius: Double?,
 ) {
-    /** Mensagem "health" para o servidor. */
+    /** Mensagem "health" para o servidor, com a versão do app (o site mostra se há atualização pendente). */
     fun toMessage(throttled: Boolean): JSONObject {
         val message = JSONObject()
             .put("type", "health")
             .put("charging", charging)
             .put("throttled", throttled)
+            .put("appPackage", BuildConfig.APPLICATION_ID)
+            .put("appVersionCode", BuildConfig.VERSION_CODE)
+            .put("appVersionName", BuildConfig.VERSION_NAME)
         if (batteryPercent != null) message.put("battery", batteryPercent)
         if (temperatureCelsius != null) message.put("temperature", temperatureCelsius)
         return message
