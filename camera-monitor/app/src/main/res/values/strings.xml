@@ -6,6 +6,7 @@
     <string name="nav_home">Início</string>
     <string name="nav_camera">Câmera</string>
     <string name="nav_settings">Ajustes</string>
+    <string name="back_again_to_exit">Toque em voltar de novo para sair</string>
 
     <!-- Câmera -->
     <string name="toggle_start">Iniciar câmera</string>

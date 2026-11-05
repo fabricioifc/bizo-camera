@@ -3,7 +3,9 @@ package br.dev.bizo.cameramonitor
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
+import androidx.activity.OnBackPressedCallback
 import androidx.annotation.IdRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -32,6 +34,35 @@ class MainActivity : AppCompatActivity() {
     // PIN já digitado nesta visita ao app (vale até o app sair da tela).
     private var unlocked = false
 
+    // Botão voltar: nas abas Câmera e Ajustes, volta ao Início. No Início (ou no login),
+    // o primeiro toque só avisa; sair exige um segundo toque em até 2 segundos.
+    private var lastBackAt = 0L
+    private val backHandler = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            if (relay.isSignedIn && binding.bottomNav.selectedItemId != R.id.nav_home) {
+                binding.bottomNav.selectedItemId = R.id.nav_home
+                return
+            }
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastBackAt <= EXIT_WINDOW_MS) {
+                lastBackAt = 0L
+                exitHint?.dismiss()
+                // Deixa o Android fazer o voltar padrão (sair do app); a câmera continua no serviço.
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+                return
+            }
+            lastBackAt = now
+            // Aviso curto acima da navegação inferior (um Toast fica por cima dela e,
+            // a partir do Android 11, não pode ser reposicionado).
+            exitHint = Snackbar.make(binding.root, R.string.back_again_to_exit, EXIT_WINDOW_MS.toInt())
+                .apply { if (binding.bottomNav.visibility == View.VISIBLE) anchorView = binding.bottomNav }
+                .also { it.show() }
+        }
+    }
+    private var exitHint: Snackbar? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Abertura com o logotipo; precisa vir antes do super.onCreate.
         installSplashScreen()
@@ -48,6 +79,7 @@ class MainActivity : AppCompatActivity() {
         binding.bottomNav.setOnItemSelectedListener { item -> selectTab(item.itemId) }
         // Tocar de novo na aba atual não recria a tela.
         binding.bottomNav.setOnItemReselectedListener { }
+        onBackPressedDispatcher.addCallback(this, backHandler)
 
         // Na primeira abertura, começa no Início; ao recriar (ex.: troca de tema), a aba é restaurada.
         if (savedInstanceState == null) showTab(R.id.nav_home)
@@ -153,5 +185,6 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val STATE_UNLOCKED = "unlocked"
+        const val EXIT_WINDOW_MS = 2_000L
     }
 }
