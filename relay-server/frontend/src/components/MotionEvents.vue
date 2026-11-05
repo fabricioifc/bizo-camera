@@ -13,7 +13,7 @@ defineProps({
     <div v-if="loaded && !events.length" class="card empty">
       <span class="empty-icon"><AppIcon name="motion" :size="28" /></span>
       <h2>Nenhum movimento registrado</h2>
-      <p class="muted">Quando a câmera detectar movimento, a foto aparece aqui.</p>
+      <p class="muted">Quando a câmera detectar movimento, a foto aparece aqui. Use "Foto agora" para conferir a câmera na hora.</p>
     </div>
     <ul v-else class="events">
       <li v-for="event in events" :key="event.id" class="card event">
@@ -21,7 +21,10 @@ defineProps({
           <img :src="snapshotUrl(event.id)" alt="Foto do movimento" loading="lazy">
         </a>
         <span v-else class="no-photo"><AppIcon name="motion" /></span>
-        <span class="event-time">{{ formatWhen(event.at) }}</span>
+        <span class="event-time">
+          <span class="event-kind" :class="event.kind">{{ event.kind === 'photo' ? 'Foto' : 'Movimento' }}</span>
+          {{ formatWhen(event.at) }}
+        </span>
       </li>
     </ul>
   </section>

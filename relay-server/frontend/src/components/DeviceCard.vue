@@ -2,7 +2,8 @@
 import { nextTick, ref } from 'vue';
 import AppIcon from './AppIcon.vue';
 import HealthInfo from './HealthInfo.vue';
-import { api, ensureOk } from '../lib/api.js';
+import PhotoDialog from './PhotoDialog.vue';
+import { api, ensureOk, takePhoto } from '../lib/api.js';
 import { formatWhen } from '../lib/format.js';
 
 const props = defineProps({ device: { type: Object, required: true } });
@@ -14,6 +15,9 @@ const name = ref('');
 const nameInput = ref(null);
 const busy = ref(false);
 const error = ref('');
+// "Foto agora": foto em qualidade alta, mostrada numa janela e guardada em Movimentos.
+const photo = ref(null);
+const photoBusy = ref(false);
 
 function deviceUrl() {
   return `/api/devices/${encodeURIComponent(props.device.id)}`;
@@ -38,6 +42,18 @@ async function run(request) {
     error.value = err.message;
   } finally {
     busy.value = false;
+  }
+}
+
+async function snap() {
+  photoBusy.value = true;
+  error.value = '';
+  try {
+    photo.value = await takePhoto(props.device.id);
+  } catch (err) {
+    error.value = err.message;
+  } finally {
+    photoBusy.value = false;
   }
 }
 
@@ -104,10 +120,22 @@ function remove() {
     </div>
 
     <div class="device-footer">
-      <button type="button" class="btn btn-primary btn-block" :disabled="!device.online" @click="$emit('open', device)">
+      <button type="button" class="btn btn-primary" :disabled="!device.online" @click="$emit('open', device)">
         <AppIcon name="play" :size="16" />
         {{ device.online ? 'Assistir' : 'Câmera offline' }}
       </button>
+      <button
+        type="button"
+        class="btn btn-secondary btn-icon"
+        :class="{ spinning: photoBusy }"
+        :disabled="!device.online || photoBusy"
+        :title="photoBusy ? 'Tirando foto…' : 'Foto agora'"
+        :aria-label="photoBusy ? 'Tirando foto' : 'Foto agora'"
+        @click="snap"
+      >
+        <AppIcon :name="photoBusy ? 'refresh' : 'photo'" :size="18" />
+      </button>
     </div>
+    <PhotoDialog v-if="photo" :event="photo" :title="device.name" @close="photo = null" />
   </article>
 </template>

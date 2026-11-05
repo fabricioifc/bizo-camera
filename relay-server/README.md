@@ -243,6 +243,10 @@ A tela de uma câmera tem duas abas: **Ao vivo** (imagem e controles) e **Movime
 
 O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valores conhecidos, com no máximo 20 pedidos a cada 10 segundos por visualizador. A câmera aplica, salva no aparelho e responde com o estado atual, que aparece em todos os visualizadores abertos. Precisa da versão do app com controle remoto; com a versão anterior, o cartão fica esperando a câmera.
 
+## Foto agora
+
+O botão de câmera ao lado de **Assistir**, na lista, e **Foto agora**, na aba Movimentos, pedem à câmera uma foto em qualidade alta (até 1920 px no lado maior), sem abrir o vídeo. A foto aparece numa janela e fica guardada em Movimentos com a etiqueta **Foto**, sem gerar alerta e sem contar como último movimento. Uma foto por vez por câmera; a câmera tem 20 segundos para responder (apps anteriores a este recurso não respondem).
+
 ## Alertas da câmera
 
 Além do movimento, o servidor avisa pela mesma notificação do navegador (ative em **Configurações > Alertas**, em cada aparelho):
@@ -277,7 +281,8 @@ O mesmo aviso (tomada, bateria, calor) não se repete em menos de 10 minutos. Ao
 - `GET /api/devices`: lista as câmeras da conta, o status online, a saúde do aparelho, o último movimento, desde quando está offline (`lastSeenAt`) e a versão do app (`app`, com `update` quando há versão publicada mais nova).
 - `PATCH /api/devices/:id`: renomeia uma câmera da conta (nome obrigatório, até 40 caracteres).
 - `DELETE /api/devices/:id`: remove uma câmera, revoga suas credenciais e encerra suas conexões; os eventos e fotos dela também são apagados.
-- `GET /api/devices/:id/events`: últimos 20 movimentos da câmera.
+- `GET /api/devices/:id/events`: últimos 20 eventos da câmera (`kind`: `motion` ou `photo`).
+- `POST /api/devices/:id/photo`: "Foto agora"; espera a câmera e responde com o evento da foto (409 se a câmera estiver offline ou ocupada, 504 se não responder).
 - `GET /api/events/:id/snapshot`: foto de um movimento.
 - `POST /api/app/release`: publica uma versão do app (corpo = o APK). Responde com pacote, versão, tamanho e sha256.
 - `GET /api/app/latest`: versão publicada (`packageName`, `versionCode`, `versionName`, `size`, `sha256`), ou 404.

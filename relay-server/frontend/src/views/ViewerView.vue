@@ -5,7 +5,9 @@ import CameraControls from '../components/CameraControls.vue';
 import HealthInfo from '../components/HealthInfo.vue';
 import MotionEvents from '../components/MotionEvents.vue';
 import PageHeader from '../components/PageHeader.vue';
-import { api } from '../lib/api.js';
+import PhotoDialog from '../components/PhotoDialog.vue';
+import StatusMessage from '../components/StatusMessage.vue';
+import { api, takePhoto } from '../lib/api.js';
 
 const RECONNECT_MS = 3000;
 
@@ -22,6 +24,23 @@ const events = ref([]);
 const eventsLoaded = ref(false);
 // Configurações informadas pela câmera (controle remoto); null até ela responder.
 const settings = ref(null);
+// "Foto agora" na aba Movimentos.
+const photo = ref(null);
+const photoBusy = ref(false);
+const photoError = ref('');
+
+async function snap() {
+  photoBusy.value = true;
+  photoError.value = '';
+  try {
+    photo.value = await takePhoto(props.device.id);
+  } catch (err) {
+    photoError.value = err.message;
+  } finally {
+    photoBusy.value = false;
+  }
+}
+
 // Abas: "live" (imagem e controles) ou "events" (fotos dos movimentos).
 const tab = ref('live');
 // Movimentos que chegaram enquanto a aba Movimentos estava fechada.
@@ -193,5 +212,16 @@ onBeforeUnmount(() => {
     <CameraControls :settings="settings" :online="online && connected" @change="configure" />
   </div>
 
-  <MotionEvents v-show="tab === 'events'" :events="events" :loaded="eventsLoaded" />
+  <div v-show="tab === 'events'">
+    <div class="events-toolbar">
+      <span class="muted small">Movimentos detectados e fotos tiradas pelo site.</span>
+      <button type="button" class="btn btn-secondary" :disabled="!online || photoBusy" @click="snap">
+        <AppIcon :name="photoBusy ? 'refresh' : 'photo'" :size="16" />
+        {{ photoBusy ? 'Tirando foto…' : 'Foto agora' }}
+      </button>
+    </div>
+    <StatusMessage :text="photoError" kind="error" />
+    <MotionEvents :events="events" :loaded="eventsLoaded" />
+  </div>
+  <PhotoDialog v-if="photo" :event="photo" :title="device.name" @close="photo = null" />
 </template>

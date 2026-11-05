@@ -6,6 +6,7 @@ const { requireFullSession } = require('./guards');
 
 const DEVICE = /^\/api\/devices\/([a-f0-9]{16})$/;
 const DEVICE_EVENTS = /^\/api\/devices\/([a-f0-9]{16})\/events$/;
+const DEVICE_PHOTO = /^\/api\/devices\/([a-f0-9]{16})\/photo$/;
 const EVENT_SNAPSHOT = /^\/api\/events\/([a-f0-9]{16})\/snapshot$/;
 
 /** Câmeras da conta: lista, registro, nome, remoção, movimentos e fotos. */
@@ -44,6 +45,17 @@ function deviceRoutes(router, app) {
     if (!devices.owned(userId, ctx.params[0])) return notFound(ctx.res);
     devices.remove(ctx.params[0]);
     return sendJson(ctx.res, 200, { ok: true });
+  });
+
+  // "Foto agora": a câmera tira uma foto em qualidade alta, guardada junto com os movimentos.
+  router.post(DEVICE_PHOTO, async (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    if (!devices.owned(userId, ctx.params[0])) return notFound(ctx.res);
+    const result = await devices.takePhoto(ctx.params[0]);
+    if (result.event) return sendJson(ctx.res, 201, { event: result.event });
+    const status = { camera_offline: 409, busy: 409, timeout: 504 }[result.error] || 502;
+    return sendJson(ctx.res, status, { error: result.error });
   });
 
   // Últimos movimentos de uma câmera da conta.

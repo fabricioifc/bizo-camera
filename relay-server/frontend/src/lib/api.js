@@ -9,6 +9,10 @@ export const MESSAGES = {
   setup_required: 'Comece a configuração antes de confirmar o código.',
   not_enabled: 'A verificação em duas etapas não está ativa.',
   invalid_credentials: 'Senha incorreta.',
+  camera_offline: 'A câmera está offline.',
+  busy: 'Já há uma foto sendo tirada nesta câmera.',
+  timeout: 'A câmera não respondeu. Se o app do celular estiver desatualizado, atualize-o.',
+  invalid_photo: 'A câmera enviou uma foto inválida. Tente de novo.',
   invalid_apk: 'Este arquivo não é um APK válido.',
   wrong_package: 'Este APK não é do app Monitor de Câmera (confira se é o build release).',
   too_large: 'Arquivo grande demais (máximo de 64 MB).',
@@ -43,4 +47,10 @@ export async function errorText(response) {
 export async function ensureOk(response) {
   if (!response.ok) throw new Error(await errorText(response));
   return response;
+}
+
+/** "Foto agora": a câmera tira uma foto em qualidade alta. Devolve o evento ou lança Error com a mensagem. */
+export async function takePhoto(deviceId) {
+  const response = await ensureOk(await post(`/api/devices/${encodeURIComponent(deviceId)}/photo`));
+  return (await response.json()).event;
 }

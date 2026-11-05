@@ -350,6 +350,8 @@ class RelayClient(context: Context) {
             "stop" -> setState(isConnected = connected, isStreaming = false)
             // Mudança de configuração pedida pelo site (controle remoto); quem aplica é o StreamService.
             "configure" -> configureHandler?.invoke(text)
+            // "Foto agora" pedida pelo site; quem tira a foto é o StreamService.
+            "capture" -> captureHandler?.invoke(text)
         }
     }
 
@@ -396,6 +398,10 @@ class RelayClient(context: Context) {
         /** Recebe as mensagens "configure" do site (JSON em texto), em qualquer thread. */
         @Volatile
         var configureHandler: ((String) -> Unit)? = null
+
+        /** Recebe os pedidos "capture" (foto agora) do site, em qualquer thread. */
+        @Volatile
+        var captureHandler: ((String) -> Unit)? = null
 
         /** Ouvintes chamados sempre que a conexão ou o pedido de transmissão muda (em qualquer thread). */
         fun addListener(listener: () -> Unit) {

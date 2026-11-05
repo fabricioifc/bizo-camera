@@ -1,6 +1,7 @@
 package br.dev.bizo.cameramonitor
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import androidx.camera.core.ImageProxy
 import java.io.ByteArrayOutputStream
@@ -25,6 +26,37 @@ fun ImageProxy.toJpeg(quality: Int, extraRotation: Int = 0): ByteArray {
     val out = ByteArrayOutputStream()
     frame.compress(Bitmap.CompressFormat.JPEG, quality, out)
     return out.toByteArray()
+}
+
+/**
+ * "Foto agora": gira o JPEG da câmera em [degrees], reduz para no máximo [maxSide] pixels
+ * no lado maior e comprime de novo com [quality].
+ */
+fun rotateAndScaleJpeg(jpeg: ByteArray, degrees: Int, maxSide: Int, quality: Int): ByteArray {
+    // Lê só o tamanho primeiro, para decodificar já reduzido (uma foto de 12 MP ocupa ~48 MB inteira).
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, bounds)
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
+    val decoded = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, BitmapFactory.Options().apply { inSampleSize = sample })
+        ?: return jpeg
+
+    val scale = minOf(1f, maxSide.toFloat() / maxOf(decoded.width, decoded.height))
+    val matrix = Matrix().apply {
+        postScale(scale, scale)
+        postRotate((((degrees % 360) + 360) % 360).toFloat())
+    }
+    val photo = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+    val out = ByteArrayOutputStream()
+    photo.compress(Bitmap.CompressFormat.JPEG, quality, out)
+    return out.toByteArray()
+}
+
+/** Bytes do JPEG entregue pelo ImageCapture (formato JPEG: um só plano com o arquivo). */
+fun ImageProxy.jpegBytes(): ByteArray {
+    val buffer = planes[0].buffer
+    buffer.rewind()
+    return ByteArray(buffer.remaining()).also { buffer.get(it) }
 }
 
 /** Rotação do sensor somada à escolhida pelo usuário, entre 0 e 359 graus. */

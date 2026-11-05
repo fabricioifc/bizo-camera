@@ -869,7 +869,13 @@ code,
 }
 
 .device-footer {
+  display: flex;
+  gap: 8px;
   padding: 0 16px 16px;
+}
+
+.device-footer .btn-primary {
+  flex: 1;
 }
 
 .rename {
@@ -1117,6 +1123,64 @@ code,
   display: grid;
   place-items: center;
   color: var(--muted);
+}
+
+.event-kind {
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.event-kind.photo {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.events-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.events-toolbar + .notice {
+  margin-bottom: 16px;
+}
+
+/* Janela da "Foto agora" */
+.dialog-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dialog {
+  width: min(900px, 100%);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+
+.dialog-photo {
+  display: block;
+  background: var(--stage);
+}
+
+.dialog-photo img {
+  display: block;
+  width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
 }
 
 .event-time {

@@ -21,6 +21,8 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.NotificationCompat
@@ -58,6 +60,12 @@ class StreamService : LifecycleService() {
     // Posição do celular (em pé, deitado...), lida pelo sensor: a imagem enviada sai sempre
     // "em pé", como na prévia do app, mesmo com o celular preso de lado.
     private var analysis: ImageAnalysis? = null
+
+    // "Foto agora": modo de foto da câmera (qualidade alta). Se o celular não aceitar foto e
+    // análise juntas, a foto sai do próximo quadro do vídeo, com qualidade alta.
+    private var imageCapture: ImageCapture? = null
+    @Volatile private var frameCaptureRequest: String? = null
+    private val photoExecutor = Executors.newSingleThreadExecutor()
     private var deviceRotation = DeviceOrientation.ROTATION_0
     @Volatile private var resetMotion = false
     private val orientationListener by lazy {
@@ -67,6 +75,7 @@ class StreamService : LifecycleService() {
                 if (next == deviceRotation) return
                 deviceRotation = next
                 analysis?.targetRotation = next
+                imageCapture?.targetRotation = next
                 // Enquadramento novo: a comparação de movimento recomeça do zero (na thread dos quadros).
                 resetMotion = true
             }
@@ -135,6 +144,9 @@ class StreamService : LifecycleService() {
         RelayClient.addListener(relayListener)
         CameraSettings.prefs(this).registerOnSharedPreferenceChangeListener(settingsListener)
         RelayClient.configureHandler = { text -> handler.post { applyRemoteSettings(text) } }
+        RelayClient.captureHandler = { text ->
+            runCatching { JSONObject(text).getString("requestId") }.getOrNull()?.let { id -> handler.post { capturePhoto(id) } }
+        }
         loadMotionSettings()
     }
 
@@ -192,6 +204,9 @@ class StreamService : LifecycleService() {
         analysis = null
         handler.removeCallbacks(updateTicker)
         RelayClient.configureHandler = null
+        RelayClient.captureHandler = null
+        imageCapture = null
+        photoExecutor.shutdown()
         camera = null
         CameraSettings.prefs(this).unregisterOnSharedPreferenceChangeListener(settingsListener)
         RelayClient.removeListener(relayListener)
@@ -263,7 +278,19 @@ class StreamService : LifecycleService() {
             val lens = CameraSettings.lens(this).selector
             val available = runCatching { provider.hasCamera(lens) }.getOrDefault(false)
             val selector = if (available) lens else CameraSelector.DEFAULT_BACK_CAMERA
-            val camera = provider.bindToLifecycle(this, selector, analysis)
+            val capture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setTargetResolution(PHOTO_RESOLUTION)
+                .setTargetRotation(deviceRotation)
+                .build()
+            val camera = try {
+                provider.bindToLifecycle(this, selector, analysis, capture).also { imageCapture = capture }
+            } catch (e: Exception) {
+                Log.w(TAG, "Câmera sem modo de foto junto com a análise; a foto sai do vídeo", e)
+                imageCapture = null
+                provider.unbindAll()
+                provider.bindToLifecycle(this, selector, analysis)
+            }
             this.camera = camera
             this.analysis = analysis
             // Câmera ou enquadramento novos: a próxima comparação de movimento recomeça do zero.
@@ -290,6 +317,11 @@ class StreamService : LifecycleService() {
             if (resetMotion) {
                 resetMotion = false
                 motionDetector.reset()
+            }
+            // "Foto agora" sem o modo de foto: usa este quadro, com qualidade alta.
+            frameCaptureRequest?.let { requestId ->
+                frameCaptureRequest = null
+                sendPhoto(requestId, image.toJpeg(PHOTO_JPEG_QUALITY, rotation.degrees))
             }
             // Movimento: confere duas vezes por segundo, mesmo sem ninguém assistindo.
             if (motionEnabled && RelayClient.connected && now - lastMotionCheckAt >= MOTION_CHECK_MS) {
@@ -318,6 +350,38 @@ class StreamService : LifecycleService() {
     private fun sendMotion(image: ImageProxy) {
         val snapshot = Base64.encodeToString(image.toJpeg(jpegQuality(), rotation.degrees), Base64.NO_WRAP)
         relay.sendMessage(JSONObject().put("type", "motion").put("snapshot", snapshot))
+    }
+
+    // "Foto agora": foto em qualidade alta, já na posição certa, enviada ao site pelo servidor.
+    private fun capturePhoto(requestId: String) {
+        val capture = imageCapture
+        if (capture == null) {
+            frameCaptureRequest = requestId
+            return
+        }
+        capture.takePicture(photoExecutor, object : ImageCapture.OnImageCapturedCallback() {
+            override fun onCaptureSuccess(image: ImageProxy) {
+                try {
+                    val degrees = image.imageInfo.rotationDegrees + rotation.degrees
+                    sendPhoto(requestId, rotateAndScaleJpeg(image.jpegBytes(), degrees, PHOTO_MAX_SIDE, PHOTO_JPEG_QUALITY))
+                } catch (e: Exception) {
+                    Log.w(TAG, "Falha ao preparar a foto", e)
+                    frameCaptureRequest = requestId
+                } finally {
+                    image.close()
+                }
+            }
+
+            override fun onError(exception: ImageCaptureException) {
+                Log.w(TAG, "Falha ao tirar a foto; usando o vídeo", exception)
+                frameCaptureRequest = requestId
+            }
+        })
+    }
+
+    private fun sendPhoto(requestId: String, jpeg: ByteArray) {
+        val snapshot = Base64.encodeToString(jpeg, Base64.NO_WRAP)
+        relay.sendMessage(JSONObject().put("type", "photo").put("requestId", requestId).put("snapshot", snapshot))
     }
 
     // Lanterna: acende só se pedida e se a lente atual tiver flash (a frontal normalmente não tem).
@@ -418,6 +482,11 @@ class StreamService : LifecycleService() {
         private const val PREFS = "stream"
         private const val KEY_SHOULD_RUN = "shouldRun"
         private const val HEALTH_INTERVAL_MS = 60_000L
+
+        // "Foto agora": até 1920 px no lado maior, JPEG com qualidade 85.
+        private val PHOTO_RESOLUTION = android.util.Size(1920, 1440)
+        private const val PHOTO_MAX_SIDE = 1920
+        private const val PHOTO_JPEG_QUALITY = 85
         private const val UPDATE_FIRST_CHECK_MS = 2 * 60_000L
         private const val UPDATE_CHECK_MS = 6 * 60 * 60_000L
 

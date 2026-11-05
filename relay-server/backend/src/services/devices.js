@@ -9,6 +9,8 @@ const MOTION_COOLDOWN_MS = 30_000; // no máximo um alerta por câmera a cada 30
 const MAX_EVENTS_PER_DEVICE = 50;
 const RECENT_EVENTS = 20;
 const MAX_SNAPSHOT_BYTES = 512 * 1024;
+const MAX_PHOTO_BYTES = 3 * 1024 * 1024; // "Foto agora", em qualidade alta
+const PHOTO_TIMEOUT_MS = 20_000;
 const MAX_NAME_LENGTH = 40;
 
 function parseJson(data) {
@@ -19,7 +21,9 @@ function parseJson(data) {
   }
 }
 
-const eventView = (event) => ({ id: event.id, at: event.at, snapshot: event.snapshot });
+// kind: "motion" (movimento detectado) ou "photo" (foto tirada pelo site).
+const eventView = (event) => ({ id: event.id, at: event.at, snapshot: event.snapshot, kind: event.kind || 'motion' });
+const isMotion = (event) => (event.kind || 'motion') === 'motion';
 
 // Saúde enviada pela câmera. Só aceita campos conhecidos, com valores plausíveis.
 function parseHealth(message) {
@@ -47,16 +51,47 @@ function parseAppVersion(message) {
 
 function createDevices({ store, hub, alerts, releases, snapshotDir }) {
   const lastMotionAt = new Map(); // deviceId -> momento do último alerta
+  const pendingPhotos = new Map(); // requestId -> { deviceId, resolve, timer }
   const snapshotPath = (eventId) => path.join(snapshotDir, `${eventId}.jpg`);
 
-  // Foto do movimento, enviada pela câmera em base64. Só aceita JPEG de tamanho razoável.
-  function saveSnapshot(eventId, base64) {
-    if (typeof base64 !== 'string' || base64.length > Math.ceil(MAX_SNAPSHOT_BYTES / 3) * 4) return false;
+  // Foto enviada pela câmera em base64. Só aceita JPEG de tamanho razoável.
+  function saveSnapshot(eventId, base64, maxBytes = MAX_SNAPSHOT_BYTES) {
+    if (typeof base64 !== 'string' || base64.length > Math.ceil(maxBytes / 3) * 4) return false;
     const jpeg = Buffer.from(base64, 'base64');
     if (jpeg.length < 4 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8) return false;
     fs.mkdirSync(snapshotDir, { recursive: true });
     fs.writeFileSync(snapshotPath(eventId), jpeg);
     return true;
+  }
+
+  // Guarda o evento e mantém só os mais recentes de cada câmera, apagando as fotos antigas.
+  function addEvent(event) {
+    store.data.events.push(event);
+    const own = store.data.events.filter((item) => item.deviceId === event.deviceId);
+    if (own.length > MAX_EVENTS_PER_DEVICE) {
+      const removed = own.slice(0, own.length - MAX_EVENTS_PER_DEVICE);
+      const removedIds = new Set(removed.map((item) => item.id));
+      for (const item of removed) if (item.snapshot) fs.rm(snapshotPath(item.id), { force: true }, () => {});
+      store.data.events = store.data.events.filter((item) => !removedIds.has(item.id));
+    }
+    store.save();
+  }
+
+  // "Foto agora": a câmera respondeu ao pedido com a foto. Guarda junto com os movimentos, sem alerta.
+  function receivePhoto(deviceId, message) {
+    const pending = typeof message.requestId === 'string' ? pendingPhotos.get(message.requestId) : null;
+    if (!pending || pending.deviceId !== deviceId) return;
+    pendingPhotos.delete(message.requestId);
+    clearTimeout(pending.timer);
+    const id = randomHex(8);
+    if (!saveSnapshot(id, message.snapshot, MAX_PHOTO_BYTES)) {
+      pending.resolve({ error: 'invalid_photo' });
+      return;
+    }
+    const event = { id, deviceId, at: Date.now(), snapshot: true, kind: 'photo' };
+    addEvent(event);
+    hub.notifyViewers(deviceId, { type: 'motion', event: eventView(event) });
+    pending.resolve({ event: eventView(event) });
   }
 
   // Movimento: guarda o evento (com foto), avisa quem está assistindo e manda notificação ao dono.
@@ -67,17 +102,7 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
 
     const id = randomHex(8);
     const event = { id, deviceId, at: now, snapshot: saveSnapshot(id, message.snapshot) };
-    store.data.events.push(event);
-
-    // Mantém só os eventos mais recentes de cada câmera, apagando as fotos antigas.
-    const own = store.data.events.filter((item) => item.deviceId === deviceId);
-    if (own.length > MAX_EVENTS_PER_DEVICE) {
-      const removed = own.slice(0, own.length - MAX_EVENTS_PER_DEVICE);
-      const removedIds = new Set(removed.map((item) => item.id));
-      for (const item of removed) if (item.snapshot) fs.rm(snapshotPath(item.id), { force: true }, () => {});
-      store.data.events = store.data.events.filter((item) => !removedIds.has(item.id));
-    }
-    store.save();
+    addEvent(event);
 
     hub.notifyViewers(deviceId, { type: 'motion', event: eventView(event) });
     const device = store.data.devices[deviceId];
@@ -110,7 +135,7 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
   function view(id) {
     const device = store.data.devices[id];
     const online = hub.isOnline(id);
-    const lastEvent = store.data.events.findLast((event) => event.deviceId === id);
+    const lastEvent = store.data.events.findLast((event) => event.deviceId === id && isMotion(event));
     return {
       id,
       name: device.name,
@@ -191,6 +216,26 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
       return snapshotPath(event.id);
     },
 
+    /**
+     * "Foto agora": pede uma foto em qualidade alta à câmera e espera a resposta.
+     * Resolve com { event } ou { error: 'camera_offline' | 'busy' | 'timeout' | 'invalid_photo' }.
+     */
+    takePhoto(deviceId) {
+      if (!hub.isOnline(deviceId)) return Promise.resolve({ error: 'camera_offline' });
+      for (const pending of pendingPhotos.values()) {
+        if (pending.deviceId === deviceId) return Promise.resolve({ error: 'busy' });
+      }
+      const requestId = randomHex(8);
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          pendingPhotos.delete(requestId);
+          resolve({ error: 'timeout' });
+        }, PHOTO_TIMEOUT_MS);
+        pendingPhotos.set(requestId, { deviceId, resolve, timer });
+        hub.sendToDevice(deviceId, { type: 'capture', requestId });
+      });
+    },
+
     /** Mensagens de texto da câmera: saúde do aparelho, movimento e configurações atuais. */
     handleMessage(deviceId, data) {
       const message = parseJson(data);
@@ -199,6 +244,7 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
         hub.setHealth(deviceId, parseHealth(message));
       }
       else if (message?.type === 'motion') recordMotion(deviceId, message);
+      else if (message?.type === 'photo') receivePhoto(deviceId, message);
       else if (message?.type === 'settings') hub.setSettings(deviceId, sanitizeReport(message.settings));
     },
 
