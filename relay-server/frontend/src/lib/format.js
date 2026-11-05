@@ -25,6 +25,10 @@ export function formatWhen(at) {
   return `${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${time}`;
 }
 
+export function clipUrl(eventId) {
+  return `/api/events/${encodeURIComponent(eventId)}/clip`;
+}
+
 export function snapshotUrl(eventId) {
   return `/api/events/${encodeURIComponent(eventId)}/snapshot`;
 }

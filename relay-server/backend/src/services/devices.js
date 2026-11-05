@@ -11,6 +11,9 @@ const RECENT_EVENTS = 20;
 const MAX_SNAPSHOT_BYTES = 512 * 1024;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024; // "Foto agora", em qualidade alta
 const PHOTO_TIMEOUT_MS = 20_000;
+const MAX_CLIP_BYTES = 8 * 1024 * 1024; // vídeo curto do movimento (MP4)
+const CLIP_WAIT_MS = 2 * 60 * 1000; // a câmera manda o vídeo alguns segundos depois do movimento
+const ID_PATTERN = /^[a-f0-9]{16}$/;
 const MAX_NAME_LENGTH = 40;
 
 function parseJson(data) {
@@ -22,7 +25,15 @@ function parseJson(data) {
 }
 
 // kind: "motion" (movimento detectado) ou "photo" (foto tirada pelo site).
-const eventView = (event) => ({ id: event.id, at: event.at, snapshot: event.snapshot, kind: event.kind || 'motion' });
+// clip: há vídeo; clipPending: o vídeo ainda está sendo gravado/enviado pela câmera.
+const eventView = (event) => ({
+  id: event.id,
+  at: event.at,
+  snapshot: event.snapshot,
+  kind: event.kind || 'motion',
+  clip: Boolean(event.clip),
+  clipPending: Boolean(event.clipId && !event.clip && Date.now() - event.at < CLIP_WAIT_MS),
+});
 const isMotion = (event) => (event.kind || 'motion') === 'motion';
 
 // Saúde enviada pela câmera. Só aceita campos conhecidos, com valores plausíveis.
@@ -49,10 +60,50 @@ function parseAppVersion(message) {
   return { code, name: text(message.appVersionName) || String(code), package: text(message.appPackage) };
 }
 
-function createDevices({ store, hub, alerts, releases, snapshotDir }) {
+function createDevices({ store, hub, alerts, releases, snapshotDir, clipStorageBytes = 500 * 1024 * 1024 }) {
   const lastMotionAt = new Map(); // deviceId -> momento do último alerta
   const pendingPhotos = new Map(); // requestId -> { deviceId, resolve, timer }
   const snapshotPath = (eventId) => path.join(snapshotDir, `${eventId}.jpg`);
+  const clipPath = (eventId) => path.join(snapshotDir, `${eventId}.mp4`);
+
+  // Apaga a foto e o vídeo de um evento.
+  function removeEventFiles(event) {
+    if (event.snapshot) fs.rm(snapshotPath(event.id), { force: true }, () => {});
+    if (event.clip) fs.rm(clipPath(event.id), { force: true }, () => {});
+  }
+
+  // Limite de espaço dos vídeos: apaga os mais antigos (o evento e a foto continuam).
+  function enforceClipStorage() {
+    const clips = store.data.events.filter((event) => event.clip).sort((a, b) => a.at - b.at);
+    let total = clips.reduce((sum, event) => sum + (event.clipSize || 0), 0);
+    for (const event of clips) {
+      if (total <= clipStorageBytes) break;
+      fs.rm(clipPath(event.id), { force: true }, () => {});
+      total -= event.clipSize || 0;
+      event.clip = false;
+      delete event.clipSize;
+      hub.notifyViewers(event.deviceId, { type: 'event', event: eventView(event) });
+    }
+  }
+
+  // Vídeo do movimento: chega depois do evento, identificado pelo clipId que a câmera mandou junto.
+  function receiveClip(deviceId, message) {
+    if (typeof message.clipId !== 'string' || !ID_PATTERN.test(message.clipId)) return;
+    const event = store.data.events.find((item) => item.deviceId === deviceId && item.clipId === message.clipId);
+    if (!event || event.clip || Date.now() - event.at > CLIP_WAIT_MS) return;
+    if (typeof message.video !== 'string' || message.video.length > Math.ceil(MAX_CLIP_BYTES / 3) * 4) return;
+    const mp4 = Buffer.from(message.video, 'base64');
+    // Arquivo MP4: "ftyp" logo no começo.
+    if (mp4.length < 12 || mp4.toString('latin1', 4, 8) !== 'ftyp') return;
+    fs.mkdirSync(snapshotDir, { recursive: true });
+    fs.writeFileSync(clipPath(event.id), mp4);
+    event.clip = true;
+    event.clipSize = mp4.length;
+    delete event.clipId;
+    enforceClipStorage();
+    store.save();
+    hub.notifyViewers(deviceId, { type: 'event', event: eventView(event) });
+  }
 
   // Foto enviada pela câmera em base64. Só aceita JPEG de tamanho razoável.
   function saveSnapshot(eventId, base64, maxBytes = MAX_SNAPSHOT_BYTES) {
@@ -71,7 +122,7 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
     if (own.length > MAX_EVENTS_PER_DEVICE) {
       const removed = own.slice(0, own.length - MAX_EVENTS_PER_DEVICE);
       const removedIds = new Set(removed.map((item) => item.id));
-      for (const item of removed) if (item.snapshot) fs.rm(snapshotPath(item.id), { force: true }, () => {});
+      for (const item of removed) removeEventFiles(item);
       store.data.events = store.data.events.filter((item) => !removedIds.has(item.id));
     }
     store.save();
@@ -102,6 +153,8 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
 
     const id = randomHex(8);
     const event = { id, deviceId, at: now, snapshot: saveSnapshot(id, message.snapshot) };
+    // A câmera grava o vídeo e manda depois, com este identificador.
+    if (typeof message.clipId === 'string' && ID_PATTERN.test(message.clipId)) event.clipId = message.clipId;
     addEvent(event);
 
     hub.notifyViewers(deviceId, { type: 'motion', event: eventView(event) });
@@ -191,7 +244,7 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
       hub.disconnect(deviceId);
       const removed = store.data.events.filter((event) => event.deviceId === deviceId);
       store.data.events = store.data.events.filter((event) => event.deviceId !== deviceId);
-      for (const event of removed) if (event.snapshot) fs.rmSync(snapshotPath(event.id), { force: true });
+      for (const event of removed) removeEventFiles(event);
       store.save();
     },
 
@@ -214,6 +267,32 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
       const event = store.data.events.find((item) => item.id === eventId);
       if (!event || !event.snapshot || !this.owned(userId, event.deviceId)) return null;
       return snapshotPath(event.id);
+    },
+
+    /** Caminho do vídeo do evento, se existir e a câmera for desse usuário. */
+    clipFor(userId, eventId) {
+      const event = store.data.events.find((item) => item.id === eventId);
+      if (!event || !event.clip || !this.owned(userId, event.deviceId)) return null;
+      return clipPath(event.id);
+    },
+
+    /** Dados do evento para nomear o arquivo baixado, se for desse usuário. */
+    eventFor(userId, eventId) {
+      const event = store.data.events.find((item) => item.id === eventId);
+      if (!event) return null;
+      const device = this.owned(userId, event.deviceId);
+      return device ? { event, device } : null;
+    },
+
+    /** Remove o evento (foto e vídeo). Devolve false se não existir ou não for desse usuário. */
+    removeEvent(userId, eventId) {
+      const found = this.eventFor(userId, eventId);
+      if (!found) return false;
+      removeEventFiles(found.event);
+      store.data.events = store.data.events.filter((item) => item.id !== eventId);
+      store.save();
+      hub.notifyViewers(found.event.deviceId, { type: 'eventRemoved', id: eventId });
+      return true;
     },
 
     /**
@@ -245,6 +324,7 @@ function createDevices({ store, hub, alerts, releases, snapshotDir }) {
       }
       else if (message?.type === 'motion') recordMotion(deviceId, message);
       else if (message?.type === 'photo') receivePhoto(deviceId, message);
+      else if (message?.type === 'clip') receiveClip(deviceId, message);
       else if (message?.type === 'settings') hub.setSettings(deviceId, sanitizeReport(message.settings));
     },
 

@@ -1,13 +1,16 @@
 'use strict';
 
 const fs = require('node:fs/promises');
+const { createReadStream } = require('node:fs');
 const { readJson, sendJson } = require('../http/respond');
 const { requireFullSession } = require('./guards');
 
 const DEVICE = /^\/api\/devices\/([a-f0-9]{16})$/;
 const DEVICE_EVENTS = /^\/api\/devices\/([a-f0-9]{16})\/events$/;
 const DEVICE_PHOTO = /^\/api\/devices\/([a-f0-9]{16})\/photo$/;
+const EVENT = /^\/api\/events\/([a-f0-9]{16})$/;
 const EVENT_SNAPSHOT = /^\/api\/events\/([a-f0-9]{16})\/snapshot$/;
+const EVENT_CLIP = /^\/api\/events\/([a-f0-9]{16})\/clip$/;
 
 /** Câmeras da conta: lista, registro, nome, remoção, movimentos e fotos. */
 function deviceRoutes(router, app) {
@@ -66,7 +69,16 @@ function deviceRoutes(router, app) {
     return sendJson(ctx.res, 200, { events: devices.recentEvents(ctx.params[0]) });
   });
 
-  // Foto de um movimento: só para o dono da câmera.
+  // Nome do arquivo baixado: câmera e data/hora do evento.
+  function downloadName(userId, eventId, extension) {
+    const found = devices.eventFor(userId, eventId);
+    if (!found) return `evento.${extension}`;
+    const name = found.device.name.normalize('NFD').replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '') || 'camera';
+    const at = new Date(found.event.at).toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    return `${name}-${at}.${extension}`;
+  }
+
+  // Foto de um evento: só para o dono da câmera. Com ?download=1, vem como arquivo para baixar.
   router.get(EVENT_SNAPSHOT, async (ctx) => {
     const userId = requireFullSession(ctx);
     if (!userId) return;
@@ -78,12 +90,69 @@ function deviceRoutes(router, app) {
       data = null;
     }
     if (!data) return notFound(ctx.res);
-    ctx.res.writeHead(200, {
+    const headers = {
       'Content-Type': 'image/jpeg',
       'Cache-Control': 'private, max-age=86400',
       'X-Content-Type-Options': 'nosniff',
-    });
+    };
+    if (ctx.url.searchParams.has('download')) {
+      headers['Content-Disposition'] = `attachment; filename="${downloadName(userId, ctx.params[0], 'jpg')}"`;
+    }
+    ctx.res.writeHead(200, headers);
     ctx.res.end(data);
+  });
+
+  // Vídeo de um movimento (MP4). Aceita Range, que o navegador usa para avançar e voltar no vídeo.
+  router.get(EVENT_CLIP, async (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    const file = devices.clipFor(userId, ctx.params[0]);
+    let size;
+    try {
+      size = file && (await fs.stat(file)).size;
+    } catch {
+      size = null;
+    }
+    if (!size) return notFound(ctx.res);
+
+    const headers = {
+      'Content-Type': 'video/mp4',
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'private, max-age=86400',
+      'X-Content-Type-Options': 'nosniff',
+    };
+    if (ctx.url.searchParams.has('download')) {
+      headers['Content-Disposition'] = `attachment; filename="${downloadName(userId, ctx.params[0], 'mp4')}"`;
+    }
+    let start = 0;
+    let end = size - 1;
+    let status = 200;
+    const range = /^bytes=(\d*)-(\d*)$/.exec(ctx.req.headers.range || '');
+    if (range && (range[1] || range[2])) {
+      if (range[1]) {
+        start = Number(range[1]);
+        if (range[2]) end = Math.min(Number(range[2]), size - 1);
+      } else {
+        start = Math.max(0, size - Number(range[2]));
+      }
+      if (start > end || start >= size) {
+        ctx.res.writeHead(416, { 'Content-Range': `bytes */${size}` });
+        return ctx.res.end();
+      }
+      status = 206;
+      headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
+    }
+    headers['Content-Length'] = end - start + 1;
+    ctx.res.writeHead(status, headers);
+    createReadStream(file, { start, end }).pipe(ctx.res);
+  });
+
+  // Remove um evento (foto e vídeo).
+  router.delete(EVENT, (ctx) => {
+    const userId = requireFullSession(ctx);
+    if (!userId) return;
+    if (!devices.removeEvent(userId, ctx.params[0])) return notFound(ctx.res);
+    return sendJson(ctx.res, 200, { ok: true });
   });
 }
 

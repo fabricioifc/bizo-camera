@@ -1105,10 +1105,32 @@ code,
   overflow: hidden;
 }
 
-.event a,
+.event-open {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
 .event .no-photo {
   display: block;
   background: var(--surface-2);
+}
+
+.event-play {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  transform: translate(-50%, -50%);
 }
 
 .event img,
@@ -1171,16 +1193,29 @@ code,
   overflow: auto;
 }
 
-.dialog-photo {
-  display: block;
+.dialog-media {
+  display: grid;
+  place-items: center;
   background: var(--stage);
 }
 
-.dialog-photo img {
+.dialog-media img,
+.dialog-media video {
   display: block;
   width: 100%;
-  max-height: 75vh;
+  max-height: 70vh;
   object-fit: contain;
+}
+
+.dialog-empty {
+  padding: 40px;
+  color: #aab2bf;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .event-time {

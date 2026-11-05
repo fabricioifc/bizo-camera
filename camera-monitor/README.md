@@ -51,6 +51,7 @@ A versão aparece no fim da aba **Ajustes** (por exemplo, "versão 0.3.0 (17)").
 - `CameraStarter`: registra o aparelho e liga ou desliga o serviço da câmera.
 - `AppUpdater`, `AppRelease`, `InstallResultReceiver`: atualização pelo próprio app (procura a versão publicada no servidor, baixa conferindo o sha256 e entrega ao instalador do Android).
 - `RemoteSettings`: formato das configurações trocadas com o site (controle remoto).
+- `ClipRecorder`, `ClipFrames`: vídeo curto do movimento (guarda 1 s antes, grava 7 s depois, codifica em MP4/H.264 com o encoder do celular).
 - `AppTheme`, `CameraMonitorApp`: tema do sistema, claro ou escuro, aplicado ao abrir o app. As cores ficam em `res/values/colors.xml` (claro) e `res/values-night/colors.xml` (escuro).
 - `StreamService`: serviço em primeiro plano que mantém a câmera e a conexão.
 - `MotionDetector`, `ThermalLimit`, `DeviceHealth`, `FrameConversion`: peças usadas pelo serviço.

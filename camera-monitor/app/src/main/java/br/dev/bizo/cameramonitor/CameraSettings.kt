@@ -46,6 +46,7 @@ object CameraSettings {
     private const val KEY_SENSITIVITY = "sensitivity"
     private const val KEY_ROTATION = "rotation"
     private const val KEY_TORCH = "torch"
+    private const val KEY_VIDEO = "video"
 
     /** Lente e qualidade exigem religar a câmera; as demais configurações valem na hora. */
     fun affectsCamera(key: String?) = key == KEY_LENS || key == KEY_QUALITY
@@ -92,6 +93,13 @@ object CameraSettings {
 
     fun setTorch(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean(KEY_TORCH, on).apply()
+    }
+
+    /** Gravar o vídeo curto do movimento (além da foto). */
+    fun motionVideo(context: Context): Boolean = prefs(context).getBoolean(KEY_VIDEO, true)
+
+    fun setMotionVideo(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_VIDEO, on).apply()
     }
 
     private inline fun <reified T : Enum<T>> enumValue(name: String?, default: T): T =

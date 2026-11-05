@@ -41,7 +41,9 @@ function createApp(config) {
     sessions: createSessions({ store, secureCookies: config.secureCookies }),
     mfa: createMfaChallenges({ accounts }),
     releases,
-    devices: createDevices({ store, hub, alerts, releases, snapshotDir: config.snapshotDir }),
+    devices: createDevices({
+      store, hub, alerts, releases, snapshotDir: config.snapshotDir, clipStorageBytes: config.clipStorageBytes,
+    }),
     rateLimit: createRateLimiter({ trustProxy: config.trustProxy }),
   };
 

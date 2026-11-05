@@ -137,6 +137,22 @@ function set(key, value) {
           ></button>
         </div>
 
+        <div class="switch-row">
+          <span class="switch-text">
+            <span class="control-label"><AppIcon name="play" :size="16" /> Gravar vídeo do movimento</span>
+            <span class="control-hint">Cerca de 8 segundos, além da foto. Gasta mais dados e espaço.</span>
+          </span>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            :aria-checked="settings.video !== false"
+            aria-label="Gravar vídeo do movimento"
+            :disabled="!settings.motion || settings.video === undefined"
+            @click="set('video', settings.video === false)"
+          ></button>
+        </div>
+
         <div class="control">
           <span class="control-label">Sensibilidade</span>
           <div class="segmented" role="group" aria-label="Sensibilidade">

@@ -10,7 +10,8 @@ const CHOICES = {
   sensitivity: ['low', 'medium', 'high'],
   rotation: [0, 90, 180, 270],
 };
-const FLAGS = ['motion', 'torch'];
+// video: gravar o vídeo curto do movimento.
+const FLAGS = ['motion', 'torch', 'video'];
 
 /** Mudanças pedidas pelo site: só as chaves e valores válidos. */
 function sanitizeChanges(input) {

@@ -191,6 +191,7 @@ Abra http://localhost:8787 no navegador.
 | `REQUIRE_2FA` | `1` | Exige verificação em duas etapas no login e antes do acesso às câmeras. No Compose de desenvolvimento fica desativado. |
 | `GOOGLE_CLIENT_ID` | (vazio) | Cliente OAuth do Google. Sem ele, o botão de login com Google fica desativado. |
 | `GOOGLE_CLIENT_SECRET` | (vazio) | Segredo do cliente OAuth. Nunca versione este valor. |
+| `CLIP_STORAGE_MB` | `500` | Espaço total para os vídeos de movimento; acima disso, os mais antigos são apagados. |
 | `OFFLINE_ALERT_MS` | `300000` | Tempo sem conexão até o alerta "Câmera offline" (em milissegundos). |
 | `APP_PACKAGE` | `br.dev.bizo.cameramonitor` | Pacote do app aceito na atualização pelo próprio app. |
 | `WEB_DIR` | `relay-server/frontend/dist` | Pasta da página compilada servida pelo backend. |
@@ -243,6 +244,14 @@ A tela de uma câmera tem duas abas: **Ao vivo** (imagem e controles) e **Movime
 
 O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valores conhecidos, com no máximo 20 pedidos a cada 10 segundos por visualizador. A câmera aplica, salva no aparelho e responde com o estado atual, que aparece em todos os visualizadores abertos. Precisa da versão do app com controle remoto; com a versão anterior, o cartão fica esperando a câmera.
 
+## Vídeo do movimento
+
+Com **Gravar vídeo do movimento** ligado (no app ou nos controles do site), a câmera grava cerca de 8 segundos a cada movimento: 1 segundo antes e 7 depois, a 8 quadros por segundo e até 480 px no lado maior, em MP4 (H.264). A foto e a notificação saem na hora; o vídeo chega alguns segundos depois e fica no mesmo evento.
+
+Na aba **Movimentos**, tocar num evento abre o vídeo (ou a foto), com **Baixar** e **Remover**. O mesmo vale para as fotos do "Foto agora".
+
+Espaço: além do limite de 50 eventos por câmera, os vídeos de todas as câmeras somam no máximo `CLIP_STORAGE_MB` (padrão 500 MB). Acima disso, os vídeos mais antigos são apagados; o evento e a foto continuam.
+
 ## Foto agora
 
 O botão de câmera ao lado de **Assistir**, na lista, e **Foto agora**, na aba Movimentos, pedem à câmera uma foto em qualidade alta (até 1920 px no lado maior), sem abrir o vídeo. A foto aparece numa janela e fica guardada em Movimentos com a etiqueta **Foto**, sem gerar alerta e sem contar como último movimento. Uma foto por vez por câmera; a câmera tem 20 segundos para responder (apps anteriores a este recurso não respondem).
@@ -287,6 +296,8 @@ O mesmo aviso (tomada, bateria, calor) não se repete em menos de 10 minutos. Ao
 - `POST /api/app/release`: publica uma versão do app (corpo = o APK). Responde com pacote, versão, tamanho e sha256.
 - `GET /api/app/latest`: versão publicada (`packageName`, `versionCode`, `versionName`, `size`, `sha256`), ou 404.
 - `GET /api/app/download`: o APK publicado.
+- `GET /api/events/:id/clip`: vídeo do movimento (MP4, aceita `Range`). Com `?download=1`, vem como arquivo para baixar; o mesmo vale para `/snapshot`.
+- `DELETE /api/events/:id`: remove o evento, com foto e vídeo.
 - `GET /api/push/key`: chave pública VAPID para assinar as notificações.
 - `POST /api/push/subscribe` e `POST /api/push/unsubscribe`: ativa ou desativa os alertas neste navegador.
 - `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`. Além dos quadros, recebe mensagens `health`, `motion` e `settings` (estado atual das configurações) e envia à câmera `start`, `stop` e `configure` (mudanças pedidas pelo site).

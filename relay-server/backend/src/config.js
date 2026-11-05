@@ -25,6 +25,8 @@ function loadConfig(env = process.env) {
       clientSecret: googleClientSecret,
       enabled: Boolean(googleClientId && googleClientSecret),
     },
+    // Espaço total para os vídeos de movimento; acima disso, os mais antigos são apagados.
+    clipStorageBytes: (Number(env.CLIP_STORAGE_MB) || 500) * 1024 * 1024,
     // Câmera sem conexão por este tempo gera o alerta "Câmera offline".
     offlineAlertMs: Number(env.OFFLINE_ALERT_MS) || 5 * 60 * 1000,
     // Pacote do app aceito nas atualizações (o build debug usa o sufixo .debug).

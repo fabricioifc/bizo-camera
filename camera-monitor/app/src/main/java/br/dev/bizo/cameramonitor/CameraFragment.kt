@@ -75,6 +75,7 @@ class CameraFragment : Fragment() {
         )
         binding.torchSwitch.isChecked = CameraSettings.torch(context)
         binding.motionSwitch.isChecked = CameraSettings.motionEnabled(context)
+        binding.videoSwitch.isChecked = CameraSettings.motionVideo(context)
         binding.sensitivityGroup.check(
             when (CameraSettings.sensitivity(context)) {
                 Sensitivity.LOW -> R.id.sensitivityLow
@@ -119,6 +120,7 @@ class CameraFragment : Fragment() {
         }
         binding.torchSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setTorch(context, checked) }
         binding.motionSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setMotionEnabled(context, checked) }
+        binding.videoSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setMotionVideo(context, checked) }
         binding.sensitivityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             val sensitivity = when (checkedId) {
@@ -136,6 +138,8 @@ class CameraFragment : Fragment() {
         val on = CameraSettings.motionEnabled(context)
         binding.motionHint.setText(if (on) R.string.motion_on_hint else R.string.motion_off_hint)
         binding.sensitivityGroup.isEnabled = on
+        binding.videoSwitch.isEnabled = on
+        binding.videoHint.alpha = if (on) 1f else 0.5f
         for (i in 0 until binding.sensitivityGroup.childCount) binding.sensitivityGroup.getChildAt(i).isEnabled = on
         binding.sensitivityHint.setText(
             when (CameraSettings.sensitivity(context)) {

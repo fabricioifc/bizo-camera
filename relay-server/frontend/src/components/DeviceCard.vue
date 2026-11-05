@@ -2,7 +2,7 @@
 import { nextTick, ref } from 'vue';
 import AppIcon from './AppIcon.vue';
 import HealthInfo from './HealthInfo.vue';
-import PhotoDialog from './PhotoDialog.vue';
+import EventDialog from './EventDialog.vue';
 import { api, ensureOk, takePhoto } from '../lib/api.js';
 import { formatWhen } from '../lib/format.js';
 
@@ -136,6 +136,6 @@ function remove() {
         <AppIcon :name="photoBusy ? 'refresh' : 'photo'" :size="18" />
       </button>
     </div>
-    <PhotoDialog v-if="photo" :event="photo" :title="device.name" @close="photo = null" />
+    <EventDialog v-if="photo" :event="photo" :title="device.name" @close="photo = null" />
   </article>
 </template>

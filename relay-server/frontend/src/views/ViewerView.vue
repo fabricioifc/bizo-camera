@@ -5,7 +5,7 @@ import CameraControls from '../components/CameraControls.vue';
 import HealthInfo from '../components/HealthInfo.vue';
 import MotionEvents from '../components/MotionEvents.vue';
 import PageHeader from '../components/PageHeader.vue';
-import PhotoDialog from '../components/PhotoDialog.vue';
+import EventDialog from '../components/EventDialog.vue';
 import StatusMessage from '../components/StatusMessage.vue';
 import { api, takePhoto } from '../lib/api.js';
 
@@ -24,7 +24,7 @@ const events = ref([]);
 const eventsLoaded = ref(false);
 // Configurações informadas pela câmera (controle remoto); null até ela responder.
 const settings = ref(null);
-// "Foto agora" na aba Movimentos.
+// Evento aberto na janela (vídeo ou foto), inclusive a "Foto agora" recém-tirada.
 const photo = ref(null);
 const photoBusy = ref(false);
 const photoError = ref('');
@@ -89,6 +89,12 @@ function handleMessage(text) {
     health.value = message.health;
   } else if (message.type === 'settings') {
     settings.value = message.settings;
+  } else if (message.type === 'event') {
+    // Evento atualizado (ex.: o vídeo do movimento chegou, ou foi apagado por falta de espaço).
+    events.value = events.value.map((item) => (item.id === message.event.id ? message.event : item));
+    if (photo.value?.id === message.event.id) photo.value = message.event;
+  } else if (message.type === 'eventRemoved') {
+    removeEvent(message.id);
   } else if (message.type === 'motion') {
     events.value.unshift(message.event);
     eventsLoaded.value = true;
@@ -119,6 +125,10 @@ function connect() {
       if (!closed) connect();
     }, RECONNECT_MS);
   };
+}
+
+function removeEvent(id) {
+  events.value = events.value.filter((item) => item.id !== id);
 }
 
 function showTab(next) {
@@ -221,7 +231,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <StatusMessage :text="photoError" kind="error" />
-    <MotionEvents :events="events" :loaded="eventsLoaded" />
+    <MotionEvents :events="events" :loaded="eventsLoaded" @open="photo = $event" />
   </div>
-  <PhotoDialog v-if="photo" :event="photo" :title="device.name" @close="photo = null" />
+  <EventDialog v-if="photo" :event="photo" :title="device.name" @close="photo = null" @removed="removeEvent" />
 </template>

@@ -85,6 +85,17 @@ class StreamService : LifecycleService() {
     // Detecção de movimento (roda na thread de análise dos quadros).
     private val motionDetector = MotionDetector()
     @Volatile private var motionEnabled = true
+    @Volatile private var videoEnabled = true
+
+    // Vídeo curto do movimento (MP4), enviado ao servidor depois da foto do movimento.
+    private val clipRecorder by lazy {
+        ClipRecorder(cacheDir) { clipId, mp4 ->
+            if (RelayClient.connected) {
+                val video = Base64.encodeToString(mp4, Base64.NO_WRAP)
+                relay.sendMessage(JSONObject().put("type", "clip").put("clipId", clipId).put("video", video))
+            }
+        }
+    }
     @Volatile private var sensitivity = Sensitivity.MEDIUM
     private var lastMotionCheckAt = 0L
     private var lastMotionSentAt = 0L
@@ -152,6 +163,7 @@ class StreamService : LifecycleService() {
 
     private fun loadMotionSettings() {
         motionEnabled = CameraSettings.motionEnabled(this)
+        videoEnabled = CameraSettings.motionVideo(this)
         sensitivity = CameraSettings.sensitivity(this)
         rotation = CameraSettings.rotation(this)
     }
@@ -207,6 +219,7 @@ class StreamService : LifecycleService() {
         RelayClient.captureHandler = null
         imageCapture = null
         photoExecutor.shutdown()
+        clipRecorder.shutdown()
         camera = null
         CameraSettings.prefs(this).unregisterOnSharedPreferenceChangeListener(settingsListener)
         RelayClient.removeListener(relayListener)
@@ -323,6 +336,10 @@ class StreamService : LifecycleService() {
                 frameCaptureRequest = null
                 sendPhoto(requestId, image.toJpeg(PHOTO_JPEG_QUALITY, rotation.degrees))
             }
+            // Vídeo do movimento: guarda o último segundo e grava enquanto houver um vídeo em andamento.
+            if (motionEnabled && videoEnabled && RelayClient.connected) {
+                clipRecorder.onFrame(image, totalRotation(image.imageInfo.rotationDegrees, rotation.degrees), now)
+            }
             // Movimento: confere duas vezes por segundo, mesmo sem ninguém assistindo.
             if (motionEnabled && RelayClient.connected && now - lastMotionCheckAt >= MOTION_CHECK_MS) {
                 lastMotionCheckAt = now
@@ -349,7 +366,14 @@ class StreamService : LifecycleService() {
     // Avisa o servidor com uma foto do momento; ele guarda o evento e manda a notificação.
     private fun sendMotion(image: ImageProxy) {
         val snapshot = Base64.encodeToString(image.toJpeg(jpegQuality(), rotation.degrees), Base64.NO_WRAP)
-        relay.sendMessage(JSONObject().put("type", "motion").put("snapshot", snapshot))
+        val message = JSONObject().put("type", "motion").put("snapshot", snapshot)
+        if (videoEnabled) {
+            // O vídeo chega depois; o servidor liga ao evento por este identificador.
+            val clipId = (1..16).map { "0123456789abcdef".random() }.joinToString("")
+            clipRecorder.start(clipId, System.currentTimeMillis())
+            message.put("clipId", clipId)
+        }
+        relay.sendMessage(message)
     }
 
     // "Foto agora": foto em qualidade alta, já na posição certa, enviada ao site pelo servidor.
@@ -402,6 +426,7 @@ class StreamService : LifecycleService() {
         RemoteSettings.parseFlag(value("motion"))?.let { CameraSettings.setMotionEnabled(this, it) }
         RemoteSettings.parseSensitivity(value("sensitivity"))?.let { CameraSettings.setSensitivity(this, it) }
         RemoteSettings.parseFlag(value("torch"))?.let { CameraSettings.setTorch(this, it) }
+        RemoteSettings.parseFlag(value("video"))?.let { CameraSettings.setMotionVideo(this, it) }
         // Sem mudança de fato (ex.: valor igual ao atual), responde mesmo assim para o site se acertar.
         reportSettings()
     }
@@ -416,6 +441,7 @@ class StreamService : LifecycleService() {
             .put("motion", CameraSettings.motionEnabled(this))
             .put("sensitivity", RemoteSettings.name(CameraSettings.sensitivity(this)))
             .put("torch", CameraSettings.torch(this))
+            .put("video", CameraSettings.motionVideo(this))
             .put("torchAvailable", camera?.cameraInfo?.hasFlashUnit() ?: false)
         relay.sendMessage(JSONObject().put("type", "settings").put("settings", settings))
     }
