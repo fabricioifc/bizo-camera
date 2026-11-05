@@ -1020,6 +1020,38 @@ code,
   font-weight: 600;
 }
 
+.control-label-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.control-value {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.zoom-presets {
+  display: flex;
+  gap: 8px;
+}
+
+.zoom-presets .btn {
+  flex: 1;
+  min-height: 34px;
+  padding: 4px 8px;
+}
+
+.zoom-presets .btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .control-hint {
   color: var(--muted);
   font-size: 0.8rem;

@@ -1,4 +1,5 @@
 <script setup>
+import { computed, ref } from 'vue';
 import AppIcon from './AppIcon.vue';
 
 // Controle remoto: mostra as configurações informadas pela câmera e pede mudanças.
@@ -24,6 +25,21 @@ const ROTATIONS = [
   { value: 90, label: '90°' },
   { value: 180, label: '180°' },
 ];
+
+// Zoom: "0,6×", "1×", "2,5×". Enquanto arrasta, só mostra; ao soltar, pede à câmera.
+const zoomDraft = ref(null);
+const zoomLabel = (value) => `${String(Math.round(value * 10) / 10).replace('.', ',')}×`;
+const zoomShown = computed(() => zoomDraft.value ?? props.settings?.zoom ?? 1);
+const zoomPresets = computed(() => {
+  const { zoomMin = 1, zoomMax = 1 } = props.settings || {};
+  return [...new Set([zoomMin, 1, 2].filter((value) => value >= zoomMin && value <= zoomMax))];
+});
+
+function commitZoom(event) {
+  const value = Number(event.target.value);
+  zoomDraft.value = null;
+  set('zoom', value);
+}
 
 function set(key, value) {
   if (props.settings?.[key] !== value) emit('change', { [key]: value });
@@ -65,6 +81,39 @@ function set(key, value) {
               @click="set('lens', option.value)"
             >{{ option.label }}</button>
           </div>
+        </div>
+
+        <div v-if="settings.zoomMin !== undefined" class="control">
+          <span class="control-label control-label-row">
+            Zoom
+            <span class="control-value">{{ zoomLabel(zoomShown) }}</span>
+          </span>
+          <input
+            class="zoom-slider"
+            type="range"
+            :min="settings.zoomMin"
+            :max="settings.zoomMax"
+            step="0.1"
+            :value="zoomShown"
+            aria-label="Zoom"
+            @input="zoomDraft = Number($event.target.value)"
+            @change="commitZoom"
+          >
+          <div class="zoom-presets">
+            <button
+              v-for="value in zoomPresets"
+              :key="value"
+              type="button"
+              class="btn btn-secondary"
+              :class="{ active: Math.abs((settings.zoom ?? 1) - value) < 0.05 }"
+              @click="set('zoom', value)"
+            >{{ zoomLabel(value) }}</button>
+          </div>
+          <span class="control-hint">
+            {{ settings.zoomMin < 1
+              ? `Abaixo de 1×, usa a câmera grande-angular (até ${zoomLabel(settings.zoomMin)}).`
+              : 'Este celular não oferece a grande-angular para outros apps: o zoom começa em 1×.' }}
+          </span>
         </div>
 
         <div class="control">

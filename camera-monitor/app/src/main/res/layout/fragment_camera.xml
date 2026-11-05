@@ -58,6 +58,74 @@
 
                 <com.google.android.material.divider.MaterialDivider style="@style/CardDivider" />
 
+                <!-- Zoom: abaixo de 1× usa a grande-angular, se o celular deixar -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/OptionLabel"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:text="@string/zoom_label" />
+
+                    <TextView
+                        android:id="@+id/zoomValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceTitleSmall"
+                        android:textColor="?attr/colorPrimary" />
+
+                </LinearLayout>
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/zoomSlider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/zoom_label"
+                    android:valueFrom="1"
+                    android:valueTo="4"
+                    android:stepSize="0.1" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/zoomMinButton"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/zoomOneButton"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/zoom_one" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/zoomTwoButton"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/zoom_two" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/zoomHint"
+                    style="@style/OptionHint" />
+
+                <com.google.android.material.divider.MaterialDivider style="@style/CardDivider" />
+
                 <TextView
                     style="@style/OptionLabel"
                     android:text="@string/image_quality_label" />

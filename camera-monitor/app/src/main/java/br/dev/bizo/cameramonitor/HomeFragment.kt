@@ -16,7 +16,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
@@ -43,7 +42,9 @@ class HomeFragment : Fragment() {
 
     // Prévia da câmera na tela (só com a transmissão parada).
     private var preview: Preview? = null
-    private var previewLens: Lens? = null
+    // Câmera da prévia (lente + grande-angular) e a câmera ligada, para ajustar o zoom sem religar.
+    private var previewKey: String? = null
+    private var previewCamera: androidx.camera.core.Camera? = null
 
     private val previewPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -227,22 +228,27 @@ class HomeFragment : Fragment() {
             val bound = current != null && provider.isBound(current)
             val show = wanted && permitted && !StreamService.isRunning && !starting &&
                 owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
-            val lens = CameraSettings.lens(context)
+            // Mesma escolha do serviço: lente e zoom (abaixo de 1×, a grande-angular, se houver).
+            val choice = CameraZoom.choose(provider, CameraSettings.lens(context), CameraSettings.zoom(context))
+            val key = "${CameraSettings.lens(context)}:${choice.wideCameraId}"
 
             if (!show) {
                 if (bound) current?.let { provider.unbind(it) }
                 preview = null
                 return@addListener
             }
-            if (bound && previewLens == lens) return@addListener
+            if (bound && previewKey == key) {
+                previewCamera?.cameraControl?.setZoomRatio(choice.ratio)
+                return@addListener
+            }
             if (bound) current?.let { provider.unbind(it) }
 
-            val available = runCatching { provider.hasCamera(lens.selector) }.getOrDefault(false)
-            val selector = if (available) lens.selector else CameraSelector.DEFAULT_BACK_CAMERA
             val newPreview = Preview.Builder().build().also { it.setSurfaceProvider(surface) }
             preview = try {
-                provider.bindToLifecycle(owner, selector, newPreview)
-                previewLens = lens
+                previewCamera = provider.bindToLifecycle(owner, choice.selector, newPreview)
+                previewCamera?.cameraControl?.setZoomRatio(choice.ratio)
+                CameraSettings.setZoomRange(context, choice.minZoom, choice.maxZoom)
+                previewKey = key
                 newPreview
             } catch (e: Exception) {
                 null

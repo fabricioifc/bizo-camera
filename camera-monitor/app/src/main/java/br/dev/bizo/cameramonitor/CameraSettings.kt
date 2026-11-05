@@ -47,6 +47,9 @@ object CameraSettings {
     private const val KEY_ROTATION = "rotation"
     private const val KEY_TORCH = "torch"
     private const val KEY_VIDEO = "video"
+    const val KEY_ZOOM = "zoom"
+    private const val KEY_ZOOM_MIN = "zoomMin"
+    private const val KEY_ZOOM_MAX = "zoomMax"
 
     /** Lente e qualidade exigem religar a câmera; as demais configurações valem na hora. */
     fun affectsCamera(key: String?) = key == KEY_LENS || key == KEY_QUALITY
@@ -100,6 +103,26 @@ object CameraSettings {
 
     fun setMotionVideo(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean(KEY_VIDEO, on).apply()
+    }
+
+    /** Zoom pedido (1 = normal; abaixo de 1 usa a grande-angular, se houver). */
+    fun zoom(context: Context): Float = prefs(context).getFloat(KEY_ZOOM, 1f)
+
+    fun setZoom(context: Context, zoom: Float) {
+        prefs(context).edit().putFloat(KEY_ZOOM, ZoomMath.round(zoom)).apply()
+    }
+
+    /** Faixa de zoom do aparelho, guardada quando a câmera liga (antes disso, 1× a 4×). */
+    fun zoomRange(context: Context): Pair<Float, Float> =
+        prefs(context).getFloat(KEY_ZOOM_MIN, 1f) to prefs(context).getFloat(KEY_ZOOM_MAX, 4f)
+
+    /** O app já ligou a câmera neste celular e sabe a faixa de zoom real. */
+    fun zoomRangeKnown(context: Context): Boolean = prefs(context).contains(KEY_ZOOM_MIN)
+
+    fun setZoomRange(context: Context, min: Float, max: Float) {
+        val (oldMin, oldMax) = zoomRange(context)
+        if (zoomRangeKnown(context) && oldMin == min && oldMax == max) return
+        prefs(context).edit().putFloat(KEY_ZOOM_MIN, min).putFloat(KEY_ZOOM_MAX, max).apply()
     }
 
     private inline fun <reified T : Enum<T>> enumValue(name: String?, default: T): T =

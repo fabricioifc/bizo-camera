@@ -15,6 +15,7 @@ object RemoteSettings {
     fun parseSensitivity(value: Any?): Sensitivity? = parseEnum<Sensitivity>(value)
     fun parseRotation(value: Any?): Rotation? = (value as? Number)?.toInt()?.let { Rotation.fromDegrees(it) }
     fun parseFlag(value: Any?): Boolean? = value as? Boolean
+    fun parseZoom(value: Any?): Float? = (value as? Number)?.toFloat()?.takeIf { it.isFinite() && it in 0.1f..20f }
 
     private inline fun <reified T : Enum<T>> parseEnum(value: Any?): T? {
         val text = value as? String ?: return null

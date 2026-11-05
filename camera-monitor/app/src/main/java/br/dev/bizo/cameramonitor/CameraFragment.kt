@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import br.dev.bizo.cameramonitor.databinding.FragmentCameraBinding
+import com.google.android.material.slider.Slider
 
 /**
  * Aba Câmera: lente, qualidade, rotação, lanterna e detecção de movimento.
@@ -83,6 +84,7 @@ class CameraFragment : Fragment() {
                 Sensitivity.HIGH -> R.id.sensitivityHigh
             }
         )
+        showZoom()
         binding.qualityHint.setText(
             when (CameraSettings.quality(context)) {
                 Quality.LOW -> R.string.quality_low_hint
@@ -93,8 +95,41 @@ class CameraFragment : Fragment() {
         showMotionState()
     }
 
+    // Zoom: faixa do aparelho (descoberta quando a câmera liga), valor e atalhos.
+    private fun showZoom() {
+        val context = requireContext()
+        val (min, max) = CameraSettings.zoomRange(context)
+        val top = maxOf(max, min + 0.1f)
+        val zoom = ZoomMath.round(CameraSettings.zoom(context).coerceIn(min, top))
+        binding.zoomSlider.valueFrom = min
+        binding.zoomSlider.valueTo = top
+        binding.zoomSlider.value = zoom
+        binding.zoomValue.text = ZoomMath.label(zoom)
+        binding.zoomMinButton.text = ZoomMath.label(min)
+        binding.zoomMinButton.visibility = if (min < 1f) View.VISIBLE else View.GONE
+        binding.zoomTwoButton.isEnabled = max >= 2f
+        binding.zoomHint.text = when {
+            !CameraSettings.zoomRangeKnown(context) -> getString(R.string.zoom_hint_unknown)
+            min < 1f -> getString(R.string.zoom_hint_wide, ZoomMath.label(min), ZoomMath.label(max))
+            else -> getString(R.string.zoom_hint_no_wide, ZoomMath.label(min), ZoomMath.label(max))
+        }
+    }
+
     private fun listenToChanges() {
         val context = requireContext()
+        binding.zoomSlider.setLabelFormatter { ZoomMath.label(it) }
+        binding.zoomSlider.addOnChangeListener { _, value, fromUser ->
+            if (fromUser) binding.zoomValue.text = ZoomMath.label(value)
+        }
+        binding.zoomSlider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) = Unit
+            override fun onStopTrackingTouch(slider: Slider) {
+                CameraSettings.setZoom(context, slider.value)
+            }
+        })
+        binding.zoomMinButton.setOnClickListener { CameraSettings.setZoom(context, CameraSettings.zoomRange(context).first) }
+        binding.zoomOneButton.setOnClickListener { CameraSettings.setZoom(context, 1f) }
+        binding.zoomTwoButton.setOnClickListener { CameraSettings.setZoom(context, 2f) }
         binding.lensGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             CameraSettings.setLens(context, if (checkedId == R.id.lensFront) Lens.FRONT else Lens.BACK)

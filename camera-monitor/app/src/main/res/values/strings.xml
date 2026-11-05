@@ -57,6 +57,12 @@
     <!-- Aba Câmera -->
     <string name="camera_intro">As mudanças valem na hora, mesmo com a câmera ligada. Também dá para mudar tudo isto pelo site, na tela da câmera.</string>
     <string name="motion_switch">Detectar movimento</string>
+    <string name="zoom_label">Zoom</string>
+    <string name="zoom_one">1×</string>
+    <string name="zoom_two">2×</string>
+    <string name="zoom_hint_wide">Abaixo de 1×, usa a câmera grande-angular (até %1$s). De 1× a %2$s, zoom na câmera principal.</string>
+    <string name="zoom_hint_no_wide">Zoom de %1$s a %2$s. Este celular não oferece a grande-angular para outros apps, então não dá para abrir abaixo de 1×.</string>
+    <string name="zoom_hint_unknown">Ligue a câmera ou abra a prévia uma vez para o app descobrir o zoom deste celular.</string>
     <string name="rotation_label">Rotação</string>
     <string name="rotation_0">0°</string>
     <string name="rotation_90">90°</string>

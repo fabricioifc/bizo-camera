@@ -53,6 +53,8 @@ class StreamService : LifecycleService() {
     @Volatile private var thermalLimit = ThermalLimit.NONE
     private var cameraState: LiveData<CameraState>? = null
     private var camera: Camera? = null
+    // Grande-angular em uso (zoom abaixo de 1×), ou null com a câmera principal.
+    private var wideCameraId: String? = null
 
     // Rotação extra escolhida pelo usuário (ajuste fino), aplicada a cada quadro enviado.
     @Volatile private var rotation = Rotation.R0
@@ -105,6 +107,8 @@ class StreamService : LifecycleService() {
     private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (CameraSettings.affectsCamera(key)) {
             handler.post { if (cameraStarted) startCamera() }
+        } else if (key == CameraSettings.KEY_ZOOM) {
+            handler.post { if (cameraStarted) applyZoom() }
         } else {
             loadMotionSettings()
             handler.post {
@@ -288,9 +292,11 @@ class StreamService : LifecycleService() {
 
             // Também libera a prévia do app, se estiver aberta: a câmera só pode ter um dono.
             provider.unbindAll()
-            val lens = CameraSettings.lens(this).selector
-            val available = runCatching { provider.hasCamera(lens) }.getOrDefault(false)
-            val selector = if (available) lens else CameraSelector.DEFAULT_BACK_CAMERA
+            // Lente e zoom: abaixo de 1×, a grande-angular (se o celular deixar usar).
+            val choice = CameraZoom.choose(provider, CameraSettings.lens(this), CameraSettings.zoom(this))
+            CameraSettings.setZoomRange(this, choice.minZoom, choice.maxZoom)
+            wideCameraId = choice.wideCameraId
+            val selector = choice.selector
             val capture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 .setTargetResolution(PHOTO_RESOLUTION)
@@ -306,6 +312,7 @@ class StreamService : LifecycleService() {
             }
             this.camera = camera
             this.analysis = analysis
+            camera.cameraControl.setZoomRatio(choice.ratio)
             // Câmera ou enquadramento novos: a próxima comparação de movimento recomeça do zero.
             motionDetector.reset()
             // A lanterna apaga ao trocar de câmera; acende de novo se estiver pedida.
@@ -408,6 +415,21 @@ class StreamService : LifecycleService() {
         relay.sendMessage(JSONObject().put("type", "photo").put("requestId", requestId).put("snapshot", snapshot))
     }
 
+    // Zoom mudou: na mesma câmera, só ajusta; se precisar trocar (principal ↔ grande-angular), religa.
+    private fun applyZoom() {
+        val providerFuture = ProcessCameraProvider.getInstance(this)
+        providerFuture.addListener({
+            val choice = CameraZoom.choose(providerFuture.get(), CameraSettings.lens(this), CameraSettings.zoom(this))
+            val current = camera
+            if (current == null || choice.wideCameraId != wideCameraId) {
+                startCamera()
+            } else {
+                current.cameraControl.setZoomRatio(choice.ratio)
+                reportSettings()
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
     // Lanterna: acende só se pedida e se a lente atual tiver flash (a frontal normalmente não tem).
     private fun applyTorch() {
         val current = camera ?: return
@@ -427,6 +449,7 @@ class StreamService : LifecycleService() {
         RemoteSettings.parseSensitivity(value("sensitivity"))?.let { CameraSettings.setSensitivity(this, it) }
         RemoteSettings.parseFlag(value("torch"))?.let { CameraSettings.setTorch(this, it) }
         RemoteSettings.parseFlag(value("video"))?.let { CameraSettings.setMotionVideo(this, it) }
+        RemoteSettings.parseZoom(value("zoom"))?.let { CameraSettings.setZoom(this, it) }
         // Sem mudança de fato (ex.: valor igual ao atual), responde mesmo assim para o site se acertar.
         reportSettings()
     }
@@ -442,6 +465,9 @@ class StreamService : LifecycleService() {
             .put("sensitivity", RemoteSettings.name(CameraSettings.sensitivity(this)))
             .put("torch", CameraSettings.torch(this))
             .put("video", CameraSettings.motionVideo(this))
+            .put("zoom", CameraSettings.zoom(this).toDouble())
+            .put("zoomMin", CameraSettings.zoomRange(this).first.toDouble())
+            .put("zoomMax", CameraSettings.zoomRange(this).second.toDouble())
             .put("torchAvailable", camera?.cameraInfo?.hasFlashUnit() ?: false)
         relay.sendMessage(JSONObject().put("type", "settings").put("settings", settings))
     }

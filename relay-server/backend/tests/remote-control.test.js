@@ -18,11 +18,16 @@ describe('valores do controle remoto', () => {
     });
     assert.deepEqual(changes, { lens: 'front', rotation: 90, torch: true, sensitivity: 'high' });
     assert.deepEqual(sanitizeChanges({ rotation: 45 }), {});
+    assert.deepEqual(sanitizeChanges({ zoom: 0.6 }), { zoom: 0.6 });
+    assert.deepEqual(sanitizeChanges({ zoom: 1.2345 }), { zoom: 1.2 });
+    assert.deepEqual(sanitizeChanges({ zoom: 50 }), {});
+    assert.deepEqual(sanitizeChanges({ zoom: '2' }), {});
     assert.deepEqual(sanitizeChanges(null), {});
   });
 
   it('o estado da câmera inclui se a lanterna existe', () => {
     assert.deepEqual(sanitizeReport({ lens: 'back', torchAvailable: false }), { lens: 'back', torchAvailable: false });
+    assert.deepEqual(sanitizeReport({ zoom: 0.6, zoomMin: 0.6, zoomMax: 8 }), { zoom: 0.6, zoomMin: 0.6, zoomMax: 8 });
   });
 });
 

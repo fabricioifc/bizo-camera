@@ -13,6 +13,12 @@ const CHOICES = {
 // video: gravar o vídeo curto do movimento.
 const FLAGS = ['motion', 'torch', 'video'];
 
+// Zoom: número entre 0,1 e 20, com uma casa decimal (abaixo de 1 usa a grande-angular, se houver).
+function zoomValue(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0.1 || value > 20) return undefined;
+  return Math.round(value * 10) / 10;
+}
+
 /** Mudanças pedidas pelo site: só as chaves e valores válidos. */
 function sanitizeChanges(input) {
   const changes = {};
@@ -23,6 +29,8 @@ function sanitizeChanges(input) {
   for (const key of FLAGS) {
     if (typeof input[key] === 'boolean') changes[key] = input[key];
   }
+  const zoom = zoomValue(input.zoom);
+  if (zoom !== undefined) changes.zoom = zoom;
   return changes;
 }
 
@@ -30,6 +38,10 @@ function sanitizeChanges(input) {
 function sanitizeReport(input) {
   const settings = sanitizeChanges(input);
   if (input && typeof input.torchAvailable === 'boolean') settings.torchAvailable = input.torchAvailable;
+  // Faixa de zoom do celular (ex.: 0,6 a 8).
+  const min = zoomValue(input?.zoomMin);
+  const max = zoomValue(input?.zoomMax);
+  if (min !== undefined && max !== undefined && min <= max) Object.assign(settings, { zoomMin: min, zoomMax: max });
   return settings;
 }
 
