@@ -22,6 +22,22 @@ Os testes de unidade (detecção de movimento, limite por calor e formato do PIN
 
 O Gradle precisa de um JDK entre 17 e 23. O Android Studio já traz um (por exemplo, `jbr-21` em `~/.jdks`); aponte o `JAVA_HOME` para ele se o terminal usar outra versão.
 
+## Gerar uma versão (release)
+
+1. Aumente `appVersionName` em `gradle.properties` (por exemplo, de `0.3.0` para `0.4.0`) e faça o commit. O `versionCode` é o número de commits do repositório, então cada release feito depois de um commit novo instala por cima do anterior.
+2. Gere o APK assinado com a mesma keystore de sempre:
+   - **Android Studio:** *Build > Generate Signed App Bundle / APK > APK*, escolha a keystore e o build **release**.
+   - **Terminal:** crie `keystore.properties` na pasta `camera-monitor` (fora do git) com `storeFile`, `storePassword`, `keyAlias` e `keyPassword`, e rode `./gradlew assembleRelease`. O APK sai em `app/build/outputs/apk/release/app-release.apk`.
+3. Instale no celular por cima da versão anterior e confira o login e a câmera.
+
+A versão aparece no fim da tela **Configurações** (por exemplo, "Versão 0.3.0 (17)").
+
+**Diferenças do release para o debug:**
+
+- O código passa pelo R8 (APK menor). As regras extras ficam em `app/proguard-rules.pro`.
+- Os erros de login mostram só a mensagem, sem o motivo técnico (código HTTP, exceção).
+- O endereço do servidor precisa ser `https://`.
+
 ## Organização do código
 
 - `MainActivity`: tela principal (status, prévia, iniciar/parar, avisos).

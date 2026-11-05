@@ -251,6 +251,12 @@
                 android:text="@string/sign_out_running_hint"
                 android:visibility="gone" />
 
+            <TextView
+                android:id="@+id/versionText"
+                style="@style/SettingsHint"
+                android:layout_marginTop="32dp"
+                android:gravity="center" />
+
         </LinearLayout>
 
     </ScrollView>

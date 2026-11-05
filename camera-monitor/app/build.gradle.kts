@@ -19,6 +19,14 @@ val relayUrl: String = (findProperty("relayUrl") as String?) ?: "https://camera.
 // Informe com -PgoogleServerClientId=... ou em ~/.gradle/gradle.properties.
 val googleServerClientId: String = (findProperty("googleServerClientId") as String?) ?: ""
 
+// Versão: o nome vem de appVersionName (gradle.properties) e o código é o número de commits,
+// que sempre cresce. Assim todo APK novo instala por cima do anterior sem editar este arquivo.
+val appVersionName: String = (findProperty("appVersionName") as String?) ?: "0.0.0"
+val appVersionCode: Int = runCatching {
+    providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }
+        .standardOutput.asText.get().trim().toInt()
+}.getOrDefault(1)
+
 android {
     namespace = "br.dev.bizo.cameramonitor"
     compileSdk = 34
@@ -27,8 +35,8 @@ android {
         applicationId = "br.dev.bizo.cameramonitor"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
         buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", "\"$googleServerClientId\"")
@@ -47,7 +55,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 encolhe o código e remove recursos sem uso: APK menor e mais rápido.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (keystoreProps.isNotEmpty()) signingConfig = signingConfigs.getByName("release")
         }
     }

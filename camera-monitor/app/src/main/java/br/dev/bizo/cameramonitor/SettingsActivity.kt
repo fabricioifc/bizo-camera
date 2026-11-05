@@ -26,6 +26,7 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.toolbar.setNavigationOnClickListener { finish() }
+        binding.versionText.text = getString(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
         setUpImageSettings()
         setUpMotionSettings()
 

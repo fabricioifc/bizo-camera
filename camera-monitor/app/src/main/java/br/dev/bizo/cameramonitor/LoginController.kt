@@ -83,7 +83,7 @@ class LoginController(
             }
             if (idToken == null) {
                 setBusy(false)
-                // Mostra o motivo técnico para diagnosticar (ex.: SHA-1 ou pacote não cadastrados no Google Cloud).
+                // No debug, mostra o motivo técnico (ex.: SHA-1 ou pacote não cadastrados no Google Cloud).
                 showError(activity.getString(R.string.login_error), failure)
                 return@launch
             }
@@ -220,8 +220,10 @@ class LoginController(
         if (needsCode) views.codeInput.requestFocus()
     }
 
+    // O motivo técnico (HTTP, exceção) só aparece no build de debug; no release, só a mensagem.
     private fun showError(text: String?, detail: String? = null) {
-        views.loginError.text = if (text == null) "" else text + (detail?.let { "\n($it)" } ?: "")
+        val technical = detail?.takeIf { BuildConfig.DEBUG }?.let { "\n($it)" } ?: ""
+        views.loginError.text = if (text == null) "" else text + technical
         views.loginError.visibility = if (text != null) View.VISIBLE else View.GONE
     }
 
