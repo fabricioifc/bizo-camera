@@ -87,6 +87,56 @@
                     android:id="@+id/qualityHint"
                     style="@style/OptionHint" />
 
+                <com.google.android.material.divider.MaterialDivider style="@style/CardDivider" />
+
+                <TextView
+                    style="@style/OptionLabel"
+                    android:text="@string/rotation_label" />
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/rotationGroup"
+                    style="@style/ChoiceGroup">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/rotation0"
+                        style="@style/ChoiceButton"
+                        android:text="@string/rotation_0" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/rotation90"
+                        style="@style/ChoiceButton"
+                        android:text="@string/rotation_90" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/rotation180"
+                        style="@style/ChoiceButton"
+                        android:text="@string/rotation_180" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/rotation270"
+                        style="@style/ChoiceButton"
+                        android:text="@string/rotation_270" />
+
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <TextView
+                    style="@style/OptionHint"
+                    android:text="@string/rotation_hint" />
+
+                <com.google.android.material.divider.MaterialDivider style="@style/CardDivider" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/torchSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/torch_switch"
+                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                <TextView
+                    style="@style/OptionHint"
+                    android:layout_marginTop="0dp"
+                    android:text="@string/torch_hint" />
+
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>

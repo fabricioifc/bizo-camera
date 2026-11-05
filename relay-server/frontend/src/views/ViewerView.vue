@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AppIcon from '../components/AppIcon.vue';
+import CameraControls from '../components/CameraControls.vue';
 import HealthInfo from '../components/HealthInfo.vue';
 import MotionEvents from '../components/MotionEvents.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -19,6 +20,8 @@ const status = ref('Conectando…');
 const frameUrl = ref('');
 const events = ref([]);
 const eventsLoaded = ref(false);
+// Configurações informadas pela câmera (controle remoto); null até ela responder.
+const settings = ref(null);
 
 const pill = computed(() => {
   if (!connected.value) return { text: 'Conectando', kind: 'warning' };
@@ -54,12 +57,15 @@ function handleMessage(text) {
     if (!message.online) {
       status.value = 'Câmera offline. Aguardando conexão…';
       health.value = null;
+      settings.value = null;
       clearFrame();
     } else if (!frameUrl.value) {
       status.value = 'Conectado. Aguardando imagem…';
     }
   } else if (message.type === 'health') {
     health.value = message.health;
+  } else if (message.type === 'settings') {
+    settings.value = message.settings;
   } else if (message.type === 'motion') {
     events.value.unshift(message.event);
     eventsLoaded.value = true;
@@ -89,6 +95,13 @@ function connect() {
       if (!closed) connect();
     }, RECONNECT_MS);
   };
+}
+
+// Controle remoto: pede a mudança à câmera e já mostra o valor novo; a resposta dela confirma.
+function configure(changes) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify({ type: 'configure', settings: changes }));
+  if (settings.value) settings.value = { ...settings.value, ...changes };
 }
 
 async function loadEvents() {
@@ -132,12 +145,15 @@ onBeforeUnmount(() => {
   </PageHeader>
 
   <div class="viewer">
-    <div class="stage">
-      <img v-if="frameUrl" :src="frameUrl" alt="Transmissão ao vivo">
-      <div v-else class="stage-status">
-        <AppIcon name="camera" :size="36" />
-        <span>{{ status }}</span>
+    <div class="viewer-main">
+      <div class="stage">
+        <img v-if="frameUrl" :src="frameUrl" alt="Transmissão ao vivo">
+        <div v-else class="stage-status">
+          <AppIcon name="camera" :size="36" />
+          <span>{{ status }}</span>
+        </div>
       </div>
+      <CameraControls :settings="settings" :online="online && connected" @change="configure" />
     </div>
     <MotionEvents :events="events" :loaded="eventsLoaded" />
   </div>

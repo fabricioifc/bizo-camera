@@ -7,8 +7,8 @@ import java.io.ByteArrayOutputStream
 
 // Conversões dos quadros RGBA entregues pela câmera (ImageAnalysis com OUTPUT_IMAGE_FORMAT_RGBA_8888).
 
-/** Converte o quadro em JPEG, já girado na orientação certa. */
-fun ImageProxy.toJpeg(quality: Int): ByteArray {
+/** Converte o quadro em JPEG, já girado na orientação certa, mais a [extraRotation] escolhida pelo usuário. */
+fun ImageProxy.toJpeg(quality: Int, extraRotation: Int = 0): ByteArray {
     val plane = planes[0]
     val rowPadding = plane.rowStride - plane.pixelStride * width
     val raw = Bitmap.createBitmap(
@@ -19,13 +19,16 @@ fun ImageProxy.toJpeg(quality: Int): ByteArray {
     plane.buffer.rewind()
     raw.copyPixelsFromBuffer(plane.buffer)
 
-    val matrix = Matrix().apply { postRotate(imageInfo.rotationDegrees.toFloat()) }
+    val matrix = Matrix().apply { postRotate(totalRotation(imageInfo.rotationDegrees, extraRotation).toFloat()) }
     val frame = Bitmap.createBitmap(raw, 0, 0, width, height, matrix, true)
 
     val out = ByteArrayOutputStream()
     frame.compress(Bitmap.CompressFormat.JPEG, quality, out)
     return out.toByteArray()
 }
+
+/** Rotação do sensor somada à escolhida pelo usuário, entre 0 e 359 graus. */
+fun totalRotation(sensorDegrees: Int, extraDegrees: Int): Int = ((sensorDegrees + extraDegrees) % 360 + 360) % 360
 
 /** Grade de brilho (0 a 255) com [columns] x [rows] pontos espalhados pelo quadro. */
 fun ImageProxy.lumaGrid(columns: Int, rows: Int): IntArray {

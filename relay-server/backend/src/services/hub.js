@@ -15,13 +15,14 @@ function keepAlive(ws) {
 }
 
 /**
- * Conexões ao vivo: liga cada câmera aos seus visualizadores e guarda a última saúde enviada.
- * Não conhece o banco; as mensagens de texto da câmera vão para onDeviceMessage.
+ * Conexões ao vivo: liga cada câmera aos seus visualizadores e guarda a última saúde e as
+ * configurações enviadas. Não conhece o banco; as mensagens de texto da câmera vão para onDeviceMessage.
  */
 function createHub() {
   const cameras = new Map(); // deviceId -> WebSocket da câmera
   const viewers = new Map(); // deviceId -> Set<WebSocket> dos visualizadores
   const health = new Map(); // deviceId -> { battery, charging, temperature, throttled, updatedAt }
+  const settings = new Map(); // deviceId -> { lens, quality, rotation, motion, sensitivity, torch, torchAvailable }
 
   function notifyViewers(deviceId, payload) {
     for (const viewer of viewers.get(deviceId) || []) sendJsonWs(viewer, payload);
@@ -47,6 +48,17 @@ function createHub() {
       notifyViewers(deviceId, { type: 'health', health: value });
     },
 
+    /** Configurações atuais informadas pela câmera; os visualizadores recebem na hora. */
+    setSettings(deviceId, value) {
+      settings.set(deviceId, value);
+      notifyViewers(deviceId, { type: 'settings', settings: value });
+    },
+
+    /** Mensagem de controle para a câmera (se ela estiver conectada). */
+    sendToDevice(deviceId, payload) {
+      sendJsonWs(cameras.get(deviceId), payload);
+    },
+
     /** Câmera conectada: envia "start" se já houver visualizadores e repassa os quadros. */
     attachDevice(deviceId, ws, onDeviceMessage) {
       const previous = cameras.get(deviceId);
@@ -63,6 +75,7 @@ function createHub() {
         if (cameras.get(deviceId) !== ws) return;
         cameras.delete(deviceId);
         health.delete(deviceId);
+        settings.delete(deviceId);
         notifyViewers(deviceId, { type: 'status', online: false });
       });
 
@@ -83,6 +96,7 @@ function createHub() {
 
       sendJsonWs(ws, { type: 'status', online: cameras.has(deviceId) });
       if (health.has(deviceId)) sendJsonWs(ws, { type: 'health', health: health.get(deviceId) });
+      if (settings.has(deviceId)) sendJsonWs(ws, { type: 'settings', settings: settings.get(deviceId) });
       if (wasIdle) sendJsonWs(cameras.get(deviceId), { type: 'start' });
 
       ws.on('close', () => {
@@ -101,6 +115,7 @@ function createHub() {
       cameras.delete(deviceId);
       viewers.delete(deviceId);
       health.delete(deviceId);
+      settings.delete(deviceId);
       if (camera) {
         sendJsonWs(camera, { type: 'stop' });
         camera.close(1008, 'camera removed');

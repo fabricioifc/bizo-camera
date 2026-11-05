@@ -1,5 +1,6 @@
 package br.dev.bizo.cameramonitor
 
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,13 +9,19 @@ import androidx.fragment.app.Fragment
 import br.dev.bizo.cameramonitor.databinding.FragmentCameraBinding
 
 /**
- * Aba Câmera: lente, qualidade e detecção de movimento.
+ * Aba Câmera: lente, qualidade, rotação, lanterna e detecção de movimento.
  * Tudo fica salvo no aparelho; o serviço aplica na hora, mesmo transmitindo.
+ * As mesmas opções podem ser mudadas pelo site: a tela acompanha essas mudanças.
  */
 class CameraFragment : Fragment() {
 
     private var _binding: FragmentCameraBinding? = null
     private val binding get() = _binding!!
+
+    // Mudança vinda do site (ou de outra tela): atualiza os botões.
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        if (_binding != null) showSettings()
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentCameraBinding.inflate(inflater, container, false)
@@ -22,8 +29,19 @@ class CameraFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        setUpImage()
-        setUpMotion()
+        showSettings()
+        listenToChanges()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        CameraSettings.prefs(requireContext()).registerOnSharedPreferenceChangeListener(prefsListener)
+        showSettings()
+    }
+
+    override fun onStop() {
+        CameraSettings.prefs(requireContext()).unregisterOnSharedPreferenceChangeListener(prefsListener)
+        super.onStop()
     }
 
     override fun onDestroyView() {
@@ -31,7 +49,8 @@ class CameraFragment : Fragment() {
         super.onDestroyView()
     }
 
-    private fun setUpImage() {
+    // Marca os botões com o que está salvo. Salvar o mesmo valor de novo não dispara nada.
+    private fun showSettings() {
         val context = requireContext()
         binding.lensGroup.check(
             when (CameraSettings.lens(context)) {
@@ -46,8 +65,35 @@ class CameraFragment : Fragment() {
                 Quality.HIGH -> R.id.qualityHigh
             }
         )
-        updateQualityHint()
+        binding.rotationGroup.check(
+            when (CameraSettings.rotation(context)) {
+                Rotation.R0 -> R.id.rotation0
+                Rotation.R90 -> R.id.rotation90
+                Rotation.R180 -> R.id.rotation180
+                Rotation.R270 -> R.id.rotation270
+            }
+        )
+        binding.torchSwitch.isChecked = CameraSettings.torch(context)
+        binding.motionSwitch.isChecked = CameraSettings.motionEnabled(context)
+        binding.sensitivityGroup.check(
+            when (CameraSettings.sensitivity(context)) {
+                Sensitivity.LOW -> R.id.sensitivityLow
+                Sensitivity.MEDIUM -> R.id.sensitivityMedium
+                Sensitivity.HIGH -> R.id.sensitivityHigh
+            }
+        )
+        binding.qualityHint.setText(
+            when (CameraSettings.quality(context)) {
+                Quality.LOW -> R.string.quality_low_hint
+                Quality.MEDIUM -> R.string.quality_medium_hint
+                Quality.HIGH -> R.string.quality_high_hint
+            }
+        )
+        showMotionState()
+    }
 
+    private fun listenToChanges() {
+        val context = requireContext()
         binding.lensGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             CameraSettings.setLens(context, if (checkedId == R.id.lensFront) Lens.FRONT else Lens.BACK)
@@ -60,26 +106,19 @@ class CameraFragment : Fragment() {
                 else -> Quality.MEDIUM
             }
             CameraSettings.setQuality(context, quality)
-            updateQualityHint()
         }
-    }
-
-    private fun setUpMotion() {
-        val context = requireContext()
-        binding.motionSwitch.isChecked = CameraSettings.motionEnabled(context)
-        binding.sensitivityGroup.check(
-            when (CameraSettings.sensitivity(context)) {
-                Sensitivity.LOW -> R.id.sensitivityLow
-                Sensitivity.MEDIUM -> R.id.sensitivityMedium
-                Sensitivity.HIGH -> R.id.sensitivityHigh
+        binding.rotationGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val rotation = when (checkedId) {
+                R.id.rotation90 -> Rotation.R90
+                R.id.rotation180 -> Rotation.R180
+                R.id.rotation270 -> Rotation.R270
+                else -> Rotation.R0
             }
-        )
-        updateMotion()
-
-        binding.motionSwitch.setOnCheckedChangeListener { _, checked ->
-            CameraSettings.setMotionEnabled(context, checked)
-            updateMotion()
+            CameraSettings.setRotation(context, rotation)
         }
+        binding.torchSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setTorch(context, checked) }
+        binding.motionSwitch.setOnCheckedChangeListener { _, checked -> CameraSettings.setMotionEnabled(context, checked) }
         binding.sensitivityGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             val sensitivity = when (checkedId) {
@@ -88,27 +127,14 @@ class CameraFragment : Fragment() {
                 else -> Sensitivity.MEDIUM
             }
             CameraSettings.setSensitivity(context, sensitivity)
-            updateMotion()
         }
     }
 
-    private fun updateQualityHint() {
-        binding.qualityHint.setText(
-            when (CameraSettings.quality(requireContext())) {
-                Quality.LOW -> R.string.quality_low_hint
-                Quality.MEDIUM -> R.string.quality_medium_hint
-                Quality.HIGH -> R.string.quality_high_hint
-            }
-        )
-    }
-
     // Com a detecção desligada, a sensibilidade fica apagada.
-    private fun updateMotion() {
+    private fun showMotionState() {
         val context = requireContext()
         val on = CameraSettings.motionEnabled(context)
         binding.motionHint.setText(if (on) R.string.motion_on_hint else R.string.motion_off_hint)
-        binding.sensitivityLabel.isEnabled = on
-        binding.sensitivityHint.isEnabled = on
         binding.sensitivityGroup.isEnabled = on
         for (i in 0 until binding.sensitivityGroup.childCount) binding.sensitivityGroup.getChildAt(i).isEnabled = on
         binding.sensitivityHint.setText(

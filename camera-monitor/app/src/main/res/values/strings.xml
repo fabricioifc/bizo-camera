@@ -55,8 +55,16 @@
     <string name="summary_pin_off">Sem PIN</string>
 
     <!-- Aba Câmera -->
-    <string name="camera_intro">As mudanças valem na hora, mesmo com a câmera ligada.</string>
+    <string name="camera_intro">As mudanças valem na hora, mesmo com a câmera ligada. Também dá para mudar tudo isto pelo site, na tela da câmera.</string>
     <string name="motion_switch">Detectar movimento</string>
+    <string name="rotation_label">Rotação</string>
+    <string name="rotation_0">0°</string>
+    <string name="rotation_90">90°</string>
+    <string name="rotation_180">180°</string>
+    <string name="rotation_270">270°</string>
+    <string name="rotation_hint">Gira a imagem enviada ao site e as fotos de movimento. Use se o celular estiver preso de lado ou de cabeça para baixo.</string>
+    <string name="torch_switch">Lanterna</string>
+    <string name="torch_hint">Acende a luz do celular enquanto a câmera transmite. Só na câmera traseira.</string>
     <string name="sensitivity_low_hint">Só movimentos grandes, como uma pessoa passando perto.</string>
     <string name="sensitivity_medium_hint">Equilíbrio entre avisar logo e evitar alarmes falsos.</string>
     <string name="sensitivity_high_hint">Percebe movimentos pequenos; pode avisar por mudanças de luz.</string>

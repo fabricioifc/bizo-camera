@@ -60,7 +60,7 @@ A versão aparece no fim da aba **Ajustes** (por exemplo, "versão 0.3.0 (17)").
 2. Na aba **Início**, toque em **Iniciar câmera**, concedendo as permissões.
 3. Abra o endereço do servidor no navegador do outro celular ou computador e entre com a mesma conta para assistir.
 
-A aba **Câmera** muda lente, qualidade e detecção de movimento (vale na hora, mesmo transmitindo). A aba **Ajustes** tem o tema (sistema, claro ou escuro), o PIN, o servidor e a conta.
+A aba **Câmera** muda lente, qualidade, rotação (para o celular preso de lado), lanterna e detecção de movimento (vale na hora, mesmo transmitindo). As mesmas opções podem ser mudadas pelo site, na tela da câmera ao vivo (controle remoto); a aba acompanha as mudanças. A aba **Ajustes** tem o tema (sistema, claro ou escuro), o PIN, o servidor e a conta.
 
 ## Configurações no Xiaomi Mi A3 (MIUI)
 

@@ -3,12 +3,21 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomHex, safeEqual, sha256 } = require('../lib/crypto');
+const { sanitizeChanges, sanitizeReport } = require('./camera-settings');
 
 const MOTION_COOLDOWN_MS = 30_000; // no máximo um alerta por câmera a cada 30 s
 const MAX_EVENTS_PER_DEVICE = 50;
 const RECENT_EVENTS = 20;
 const MAX_SNAPSHOT_BYTES = 512 * 1024;
 const MAX_NAME_LENGTH = 40;
+
+function parseJson(data) {
+  try {
+    return JSON.parse(data.toString());
+  } catch {
+    return null;
+  }
+}
 
 const eventView = (event) => ({ id: event.id, at: event.at, snapshot: event.snapshot });
 
@@ -148,16 +157,23 @@ function createDevices({ store, hub, alerts, snapshotDir }) {
       return snapshotPath(event.id);
     },
 
-    /** Mensagens de texto da câmera: saúde do aparelho e movimento. */
+    /** Mensagens de texto da câmera: saúde do aparelho, movimento e configurações atuais. */
     handleMessage(deviceId, data) {
-      let message;
-      try {
-        message = JSON.parse(data.toString());
-      } catch {
-        return;
-      }
-      if (message && message.type === 'health') hub.setHealth(deviceId, parseHealth(message));
-      else if (message && message.type === 'motion') recordMotion(deviceId, message);
+      const message = parseJson(data);
+      if (message?.type === 'health') hub.setHealth(deviceId, parseHealth(message));
+      else if (message?.type === 'motion') recordMotion(deviceId, message);
+      else if (message?.type === 'settings') hub.setSettings(deviceId, sanitizeReport(message.settings));
+    },
+
+    /**
+     * Controle remoto: mensagem de um visualizador pedindo mudanças na câmera.
+     * Só valores conhecidos seguem para a câmera, que aplica e responde com o estado novo.
+     */
+    handleViewerMessage(deviceId, data) {
+      const message = parseJson(data);
+      if (message?.type !== 'configure') return;
+      const changes = sanitizeChanges(message.settings);
+      if (Object.keys(changes).length) hub.sendToDevice(deviceId, { type: 'configure', settings: changes });
     },
   };
 }

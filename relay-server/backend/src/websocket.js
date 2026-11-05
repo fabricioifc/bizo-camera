@@ -5,6 +5,27 @@ const { bearerToken, cookieToken } = require('./http/respond');
 
 const MAX_PAYLOAD = 1024 * 1024;
 const PING_MS = 30_000;
+// Comandos do visualizador (controle remoto): mensagens pequenas e poucas por vez.
+const MAX_VIEWER_MESSAGE = 2048;
+const VIEWER_BURST = 20;
+const VIEWER_WINDOW_MS = 10_000;
+
+// Controle remoto: repassa os comandos do visualizador, com limite de tamanho e de quantidade.
+function listenToViewer(ws, deviceId, devices) {
+  let windowStart = Date.now();
+  let count = 0;
+  ws.on('message', (data, isBinary) => {
+    if (isBinary || data.length > MAX_VIEWER_MESSAGE) return;
+    const now = Date.now();
+    if (now - windowStart > VIEWER_WINDOW_MS) {
+      windowStart = now;
+      count = 0;
+    }
+    count += 1;
+    if (count > VIEWER_BURST) return;
+    devices.handleViewerMessage(deviceId, data);
+  });
+}
 
 function reject(socket, status) {
   socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);
@@ -35,7 +56,10 @@ function attachWebSockets(server, { config, sessions, devices, hub }) {
       const userId = sessions.userId(token);
       const pending = config.require2fa && sessions.isPending(token);
       if (!userId || pending || !devices.owned(userId, deviceId)) return reject(socket, '403 Forbidden');
-      return wss.handleUpgrade(req, socket, head, (ws) => hub.attachViewer(deviceId, ws));
+      return wss.handleUpgrade(req, socket, head, (ws) => {
+        hub.attachViewer(deviceId, ws);
+        listenToViewer(ws, deviceId, devices);
+      });
     }
 
     return reject(socket, '404 Not Found');

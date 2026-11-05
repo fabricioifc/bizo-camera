@@ -16,6 +16,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.util.Base64
 import android.util.Log
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
 import androidx.camera.core.ImageAnalysis
@@ -48,6 +49,10 @@ class StreamService : LifecycleService() {
     @Volatile private var quality = Quality.MEDIUM
     @Volatile private var thermalLimit = ThermalLimit.NONE
     private var cameraState: LiveData<CameraState>? = null
+    private var camera: Camera? = null
+
+    // Rotação extra escolhida pelo usuário (celular de lado), aplicada a cada quadro enviado.
+    @Volatile private var rotation = Rotation.R0
 
     // Detecção de movimento (roda na thread de análise dos quadros).
     private val motionDetector = MotionDetector()
@@ -56,20 +61,27 @@ class StreamService : LifecycleService() {
     private var lastMotionCheckAt = 0L
     private var lastMotionSentAt = 0L
 
-    // Lente ou qualidade alteradas no app: troca a câmera sem parar a transmissão.
-    // Detecção de movimento: vale na hora, sem religar a câmera.
+    // Configuração alterada no app ou pelo site. Lente ou qualidade: troca a câmera sem parar a transmissão.
+    // Movimento, rotação e lanterna: valem na hora. Em todos os casos, o site recebe o estado novo.
     private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (CameraSettings.affectsCamera(key)) {
             handler.post { if (cameraStarted) startCamera() }
         } else {
             loadMotionSettings()
+            handler.post {
+                applyTorch()
+                reportSettings()
+            }
         }
     }
 
     // Atualiza a notificação quando a conexão muda e envia a saúde logo após conectar.
     private val relayListener: () -> Unit = {
         val connected = RelayClient.connected
-        if (connected && !wasConnected) handler.post { reportHealth() }
+        if (connected && !wasConnected) handler.post {
+            reportHealth()
+            reportSettings()
+        }
         wasConnected = connected
         updateNotification()
     }
@@ -94,12 +106,14 @@ class StreamService : LifecycleService() {
         relay = RelayClient(this)
         RelayClient.addListener(relayListener)
         CameraSettings.prefs(this).registerOnSharedPreferenceChangeListener(settingsListener)
+        RelayClient.configureHandler = { text -> handler.post { applyRemoteSettings(text) } }
         loadMotionSettings()
     }
 
     private fun loadMotionSettings() {
         motionEnabled = CameraSettings.motionEnabled(this)
         sensitivity = CameraSettings.sensitivity(this)
+        rotation = CameraSettings.rotation(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -144,6 +158,8 @@ class StreamService : LifecycleService() {
         isThrottled = false
         cameraStarted = false
         handler.removeCallbacks(healthTicker)
+        RelayClient.configureHandler = null
+        camera = null
         CameraSettings.prefs(this).unregisterOnSharedPreferenceChangeListener(settingsListener)
         RelayClient.removeListener(relayListener)
         relay.stop()
@@ -214,8 +230,12 @@ class StreamService : LifecycleService() {
             val available = runCatching { provider.hasCamera(lens) }.getOrDefault(false)
             val selector = if (available) lens else CameraSelector.DEFAULT_BACK_CAMERA
             val camera = provider.bindToLifecycle(this, selector, analysis)
+            this.camera = camera
             // Câmera ou enquadramento novos: a próxima comparação de movimento recomeça do zero.
             motionDetector.reset()
+            // A lanterna apaga ao trocar de câmera; acende de novo se estiver pedida.
+            applyTorch()
+            reportSettings()
             // Erro grave (ex.: câmera bloqueada pelo sistema por ter sido aberta em segundo plano).
             cameraState?.removeObservers(this)
             cameraState = camera.cameraInfo.cameraState
@@ -245,7 +265,7 @@ class StreamService : LifecycleService() {
             val interval = maxOf(quality.frameIntervalMs, thermalLimit.minFrameIntervalMs)
             if (!RelayClient.streaming || now - lastFrameAt < interval) return
             lastFrameAt = now
-            relay.sendFrame(image.toJpeg(jpegQuality()))
+            relay.sendFrame(image.toJpeg(jpegQuality(), rotation.degrees))
         } catch (e: Exception) {
             Log.w(TAG, "Falha ao converter quadro", e)
         } finally {
@@ -257,8 +277,44 @@ class StreamService : LifecycleService() {
 
     // Avisa o servidor com uma foto do momento; ele guarda o evento e manda a notificação.
     private fun sendMotion(image: ImageProxy) {
-        val snapshot = Base64.encodeToString(image.toJpeg(jpegQuality()), Base64.NO_WRAP)
+        val snapshot = Base64.encodeToString(image.toJpeg(jpegQuality(), rotation.degrees), Base64.NO_WRAP)
         relay.sendMessage(JSONObject().put("type", "motion").put("snapshot", snapshot))
+    }
+
+    // Lanterna: acende só se pedida e se a lente atual tiver flash (a frontal normalmente não tem).
+    private fun applyTorch() {
+        val current = camera ?: return
+        if (!current.cameraInfo.hasFlashUnit()) return
+        current.cameraControl.enableTorch(CameraSettings.torch(this))
+    }
+
+    // Controle remoto: o site pediu mudanças. Valores desconhecidos são ignorados.
+    // Salvar dispara o settingsListener, que aplica e responde ao site com o estado novo.
+    private fun applyRemoteSettings(text: String) {
+        val settings = runCatching { JSONObject(text).getJSONObject("settings") }.getOrNull() ?: return
+        fun value(key: String): Any? = if (settings.has(key)) settings.get(key) else null
+        RemoteSettings.parseLens(value("lens"))?.let { CameraSettings.setLens(this, it) }
+        RemoteSettings.parseQuality(value("quality"))?.let { CameraSettings.setQuality(this, it) }
+        RemoteSettings.parseRotation(value("rotation"))?.let { CameraSettings.setRotation(this, it) }
+        RemoteSettings.parseFlag(value("motion"))?.let { CameraSettings.setMotionEnabled(this, it) }
+        RemoteSettings.parseSensitivity(value("sensitivity"))?.let { CameraSettings.setSensitivity(this, it) }
+        RemoteSettings.parseFlag(value("torch"))?.let { CameraSettings.setTorch(this, it) }
+        // Sem mudança de fato (ex.: valor igual ao atual), responde mesmo assim para o site se acertar.
+        reportSettings()
+    }
+
+    // Estado atual das configurações, para o site mostrar nos controles.
+    private fun reportSettings() {
+        if (!RelayClient.connected) return
+        val settings = JSONObject()
+            .put("lens", RemoteSettings.name(CameraSettings.lens(this)))
+            .put("quality", RemoteSettings.name(CameraSettings.quality(this)))
+            .put("rotation", CameraSettings.rotation(this).degrees)
+            .put("motion", CameraSettings.motionEnabled(this))
+            .put("sensitivity", RemoteSettings.name(CameraSettings.sensitivity(this)))
+            .put("torch", CameraSettings.torch(this))
+            .put("torchAvailable", camera?.cameraInfo?.hasFlashUnit() ?: false)
+        relay.sendMessage(JSONObject().put("type", "settings").put("settings", settings))
     }
 
     // Lê bateria e temperatura, ajusta a qualidade conforme o calor e avisa o servidor.

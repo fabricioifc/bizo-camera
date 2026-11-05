@@ -25,6 +25,18 @@ enum class Sensitivity(val changedFraction: Float) {
     HIGH(0.02f),
 }
 
+/** Rotação extra da imagem enviada, para o celular preso de lado ou de cabeça para baixo. */
+enum class Rotation(val degrees: Int) {
+    R0(0),
+    R90(90),
+    R180(180),
+    R270(270);
+
+    companion object {
+        fun fromDegrees(degrees: Int): Rotation? = values().firstOrNull { it.degrees == degrees }
+    }
+}
+
 /** Configurações da câmera, salvas no aparelho. */
 object CameraSettings {
     private const val PREFS = "camera_settings"
@@ -32,6 +44,8 @@ object CameraSettings {
     private const val KEY_QUALITY = "quality"
     private const val KEY_MOTION = "motion"
     private const val KEY_SENSITIVITY = "sensitivity"
+    private const val KEY_ROTATION = "rotation"
+    private const val KEY_TORCH = "torch"
 
     /** Lente e qualidade exigem religar a câmera; as demais configurações valem na hora. */
     fun affectsCamera(key: String?) = key == KEY_LENS || key == KEY_QUALITY
@@ -64,6 +78,20 @@ object CameraSettings {
 
     fun setQuality(context: Context, quality: Quality) {
         prefs(context).edit().putString(KEY_QUALITY, quality.name).apply()
+    }
+
+    fun rotation(context: Context): Rotation =
+        enumValue(prefs(context).getString(KEY_ROTATION, null), Rotation.R0)
+
+    fun setRotation(context: Context, rotation: Rotation) {
+        prefs(context).edit().putString(KEY_ROTATION, rotation.name).apply()
+    }
+
+    /** Lanterna pedida; só acende com a câmera ligada e numa lente com flash. */
+    fun torch(context: Context): Boolean = prefs(context).getBoolean(KEY_TORCH, false)
+
+    fun setTorch(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_TORCH, on).apply()
     }
 
     private inline fun <reified T : Enum<T>> enumValue(name: String?, default: T): T =

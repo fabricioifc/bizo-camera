@@ -221,6 +221,16 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 - Login, cadastro e códigos 2FA têm limite de tentativas por IP, por minuto.
 - Cada código TOTP vale uma vez e códigos de recuperação são apagados depois de usados.
 
+## Controle remoto
+
+Na tela de uma câmera ao vivo, o cartão **Controles da câmera** muda, sem tocar no celular:
+
+- câmera (traseira ou frontal), rotação (0°, 90°, 180° ou 270°, para o celular preso de lado) e qualidade;
+- lanterna (só em lentes com flash; a frontal normalmente não tem);
+- detecção de movimento e sensibilidade.
+
+O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valores conhecidos, com no máximo 20 pedidos a cada 10 segundos por visualizador. A câmera aplica, salva no aparelho e responde com o estado atual, que aparece em todos os visualizadores abertos. Precisa da versão do app com controle remoto; com a versão anterior, o cartão fica esperando a câmera.
+
 ## Alertas de movimento
 
 - O app da câmera detecta movimento e envia um evento com uma foto. O servidor aceita no máximo um alerta por câmera a cada 30 segundos e guarda os 50 eventos mais recentes de cada câmera.
@@ -248,7 +258,7 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 - `GET /api/events/:id/snapshot`: foto de um movimento.
 - `GET /api/push/key`: chave pública VAPID para assinar as notificações.
 - `POST /api/push/subscribe` e `POST /api/push/unsubscribe`: ativa ou desativa os alertas neste navegador.
-- `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`. Além dos quadros, recebe mensagens `health` e `motion`.
-- `WS /ws/view?device=...`: conexão do visualizador da conta, que recebe os quadros JPEG, a saúde e os movimentos ao vivo. Usa o cookie de sessão.
+- `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`. Além dos quadros, recebe mensagens `health`, `motion` e `settings` (estado atual das configurações) e envia à câmera `start`, `stop` e `configure` (mudanças pedidas pelo site).
+- `WS /ws/view?device=...`: conexão do visualizador da conta, que recebe os quadros JPEG, a saúde, as configurações e os movimentos ao vivo, e envia `configure` para o controle remoto. Usa o cookie de sessão.
 
 A sessão da web fica num cookie `HttpOnly`, então o JavaScript da página não consegue lê-la. O app Android usa o token do corpo da resposta, no cabeçalho `Authorization: Bearer`.
