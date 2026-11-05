@@ -6,6 +6,7 @@ import { base64UrlToBytes, serviceWorker } from '../lib/push.js';
 
 // Alertas de movimento por Web Push neste navegador.
 const registration = ref(null);
+const ready = ref(false);
 const subscribed = ref(false);
 const blocked = ref(false);
 const busy = ref(false);
@@ -50,29 +51,39 @@ async function toggle() {
 
 onMounted(async () => {
   registration.value = await serviceWorker();
-  await refresh();
+  await refresh().catch(() => {});
+  ready.value = true;
 });
 </script>
 
 <template>
-  <section v-if="registration" class="card alerts-card" aria-label="Alertas de movimento">
-    <span class="alerts-icon"><AppIcon name="bell" /></span>
-    <div class="alerts-text">
-      <strong>Alertas de movimento</strong>
-      <p v-if="error" class="small text-danger">{{ error }}</p>
-      <p v-else-if="blocked" class="small muted">Bloqueados nas configurações do navegador.</p>
-      <p v-else-if="subscribed" class="small muted">Ativados neste aparelho.</p>
-      <p v-else class="small muted">Receba um aviso neste aparelho quando houver movimento.</p>
+  <section class="card" aria-labelledby="alerts-title">
+    <div class="card-header">
+      <div>
+        <h2 id="alerts-title">Alertas de movimento</h2>
+        <p class="small muted">Notificação neste aparelho quando uma câmera detectar movimento.</p>
+      </div>
     </div>
-    <button
-      v-if="!blocked"
-      type="button"
-      class="btn"
-      :class="subscribed ? 'btn-secondary' : 'btn-primary'"
-      :disabled="busy"
-      @click="toggle"
-    >
-      {{ subscribed ? 'Desativar' : 'Ativar alertas' }}
-    </button>
+    <div class="setting">
+      <span class="setting-icon"><AppIcon name="bell" /></span>
+      <div class="setting-text">
+        <template v-if="!ready">Verificando…</template>
+        <template v-else-if="!registration">Este navegador não aceita notificações.</template>
+        <template v-else-if="blocked">Bloqueados nas configurações do navegador.</template>
+        <template v-else-if="subscribed">Ativados neste aparelho.</template>
+        <template v-else>Desativados neste aparelho.</template>
+        <p v-if="error" class="small text-danger">{{ error }}</p>
+      </div>
+      <button
+        v-if="registration && !blocked"
+        type="button"
+        class="btn"
+        :class="subscribed ? 'btn-secondary' : 'btn-primary'"
+        :disabled="busy"
+        @click="toggle"
+      >
+        {{ subscribed ? 'Desativar' : 'Ativar' }}
+      </button>
+    </div>
   </section>
 </template>

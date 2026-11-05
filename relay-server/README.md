@@ -154,8 +154,8 @@ frontend/
   src/
     App.vue        navegação entre as telas e estado da sessão
     layouts/       AuthLayout (cartão centralizado, sem login) e AppLayout (barra lateral; gaveta no celular)
-    views/         telas: login, código 2FA, segurança, lista de câmeras, câmera ao vivo
-    components/    barra lateral, cabeçalho de tela, ícones, tema, cartão da câmera, alertas, movimentos
+    views/         telas: login, código 2FA, câmeras, câmera ao vivo, segurança, configurações
+    components/    barra lateral, cabeçalho de tela, ícones, tema, cartão da câmera, cartão de alertas, movimentos
     lib/           chamadas à API, formatação, Web Push, tema claro/escuro
     styles.css     tokens de cor dos dois temas e todo o visual
   vite.config.js
@@ -220,7 +220,7 @@ Na web, o login é só pelo Google e o 2FA é obrigatório. Se a conta ainda nã
 
 - O app da câmera detecta movimento e envia um evento com uma foto. O servidor aceita no máximo um alerta por câmera a cada 30 segundos e guarda os 50 eventos mais recentes de cada câmera.
 - As fotos ficam em `snapshots/`, ao lado do banco (no Docker, dentro do volume `relay-data`). Só o dono da câmera consegue abri-las.
-- Para receber notificações, toque em **Ativar alertas** na lista de câmeras, em cada navegador ou celular onde quer o aviso. O navegador pede permissão.
+- Para receber notificações, abra **Configurações** no menu e toque em **Ativar** em Alertas de movimento, em cada navegador ou celular onde quer o aviso. O navegador pede permissão.
 - As notificações usam Web Push. As chaves VAPID são geradas na primeira execução e salvas em `vapid.json`, também ao lado do banco. Se esse arquivo for apagado, os alertas precisam ser ativados de novo em cada aparelho.
 - No iPhone, as notificações só funcionam com o site adicionado à tela de início (iOS 16.4 ou mais novo).
 

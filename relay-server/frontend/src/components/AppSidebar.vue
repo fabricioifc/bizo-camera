@@ -1,6 +1,5 @@
 <script setup>
 import AppIcon from './AppIcon.vue';
-import ThemeToggle from './ThemeToggle.vue';
 
 defineProps({
   section: { type: String, required: true },
@@ -13,6 +12,7 @@ defineEmits(['navigate', 'logout']);
 const ITEMS = [
   { section: 'cameras', icon: 'camera', label: 'Câmeras' },
   { section: 'security', icon: 'shield', label: 'Segurança' },
+  { section: 'settings', icon: 'sliders', label: 'Configurações' },
 ];
 </script>
 
@@ -46,7 +46,6 @@ const ITEMS = [
           {{ connectionOk ? 'Servidor conectado' : 'Sem conexão' }}
         </span>
       </span>
-      <ThemeToggle />
       <div class="account">
         <span class="avatar" aria-hidden="true">{{ email ? email[0] : '?' }}</span>
         <span class="account-email" :title="email">{{ email }}</span>

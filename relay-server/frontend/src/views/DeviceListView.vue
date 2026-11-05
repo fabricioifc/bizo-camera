@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import AlertsBar from '../components/AlertsBar.vue';
 import AppIcon from '../components/AppIcon.vue';
 import DeviceCard from '../components/DeviceCard.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -55,14 +54,20 @@ onBeforeUnmount(() => clearTimeout(timer));
       {{ devices.length ? `${onlineCount} de ${devices.length} online` : 'Nenhuma câmera registrada' }}
     </template>
     <template #actions>
-      <button type="button" class="btn btn-secondary" :disabled="loading" @click="load">
-        <AppIcon name="refresh" :size="16" />
-        Atualizar
+      <button
+        type="button"
+        class="btn btn-secondary btn-icon"
+        :class="{ spinning: loading }"
+        :disabled="loading"
+        title="Atualizar"
+        aria-label="Atualizar"
+        @click="load"
+      >
+        <AppIcon name="refresh" :size="18" />
       </button>
     </template>
   </PageHeader>
 
-  <AlertsBar />
   <StatusMessage :text="error" kind="error" />
 
   <div v-if="devices.length" class="devices">

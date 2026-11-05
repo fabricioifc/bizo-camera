@@ -6,11 +6,12 @@ import DeviceListView from './views/DeviceListView.vue';
 import LoginView from './views/LoginView.vue';
 import MfaView from './views/MfaView.vue';
 import SecurityView from './views/SecurityView.vue';
+import SettingsView from './views/SettingsView.vue';
 import ViewerView from './views/ViewerView.vue';
 import { api, MESSAGES } from './lib/api.js';
 import { serviceWorker } from './lib/push.js';
 
-// Telas: auth e mfa (sem login, cartão centralizado); list, viewer e security (com a barra lateral).
+// Telas: auth e mfa (sem login, cartão centralizado); list, viewer, security e settings (com a barra lateral).
 // Cada tela cuida dos próprios dados; aqui ficam só a navegação e o estado da sessão.
 const view = ref('loading');
 const connectionOk = ref(false);
@@ -22,7 +23,7 @@ const viewerDevice = ref(null);
 const authMessage = ref('');
 const authError = ref(false);
 
-const section = computed(() => (view.value === 'security' ? 'security' : 'cameras'));
+const section = computed(() => (['security', 'settings'].includes(view.value) ? view.value : 'cameras'));
 
 function showAuth(message = '', isError = false) {
   pendingSetup.value = false;
@@ -49,6 +50,7 @@ function showList() {
 
 function navigate(target) {
   if (target === 'security') showSecurity();
+  else if (target === 'settings' && !pendingSetup.value) view.value = 'settings';
   else showList();
 }
 
@@ -171,6 +173,8 @@ onMounted(initialize);
       @unauthorized="showAuth()"
       @done="finishSetup"
     />
+
+    <SettingsView v-else-if="view === 'settings'" />
 
     <DeviceListView
       v-else-if="view === 'list'"

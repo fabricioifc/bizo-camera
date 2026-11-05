@@ -81,7 +81,7 @@ onMounted(load);
     <template #subtitle>Conta e verificação em duas etapas</template>
   </PageHeader>
 
-  <div class="security">
+  <div class="page-narrow">
     <StatusMessage
       v-if="pendingSetup"
       kind="warning"
