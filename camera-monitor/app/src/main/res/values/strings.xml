@@ -10,29 +10,36 @@
 
     <!-- Status -->
     <string name="status_signed_out_title">Sem conta</string>
-    <string name="status_signed_out_detail">Entre com sua conta Google para usar este celular como câmera.</string>
+    <string name="status_signed_out_detail">Entre com sua conta Google para começar.</string>
     <string name="status_stopped_title">Câmera parada</string>
-    <string name="status_stopped_detail">Toque em Iniciar câmera. A imagem só é enviada quando alguém estiver assistindo.</string>
+    <string name="status_stopped_detail">Toque em Iniciar câmera para começar a vigiar.</string>
     <string name="status_connecting_title">Conectando…</string>
     <string name="status_connecting_detail">Aguardando conexão com o servidor.</string>
-    <string name="status_ready_title">Pronta</string>
-    <string name="status_ready_detail">Conectada. Aguardando alguém abrir a câmera.</string>
+    <string name="status_ready_title">Vigiando</string>
+    <string name="status_ready_detail">Ninguém assistindo agora.</string>
     <string name="status_live_title">Ao vivo</string>
-    <string name="status_live_detail">Transmitindo para quem está assistindo.</string>
-    <string name="account_label">Conta: %1$s</string>
+    <string name="status_live_detail">Alguém está assistindo agora.</string>
     <string name="status_uptime">Conectada há %1$s</string>
     <string name="status_hot">celular quente, qualidade reduzida</string>
     <plurals name="status_drops">
-        <item quantity="one">%d queda de conexão</item>
-        <item quantity="other">%d quedas de conexão</item>
+        <item quantity="one">%d queda</item>
+        <item quantity="other">%d quedas</item>
     </plurals>
     <string name="duration_less_than_minute">menos de 1 min</string>
     <string name="duration_minutes">%1$d min</string>
     <string name="duration_hours">%1$d h %2$d min</string>
 
-    <!-- Prévia e imagem -->
+    <!-- Prévia -->
     <string name="preview_permission">Permita o uso da câmera para ver a prévia.</string>
     <string name="preview_permission_button">Permitir câmera</string>
+
+    <!-- Economia de bateria -->
+    <string name="battery_short">Permita que a câmera funcione com a tela apagada.</string>
+    <string name="battery_button">Permitir</string>
+
+    <!-- Configurações -->
+    <string name="settings_title">Configurações</string>
+    <string name="settings_back">Voltar</string>
     <string name="image_title">Imagem</string>
     <string name="image_lens_label">Câmera</string>
     <string name="lens_back">Traseira</string>
@@ -44,20 +51,18 @@
     <string name="quality_low_hint">320×240, cerca de 5 quadros por segundo. Gasta pouco dado no 4G.</string>
     <string name="quality_medium_hint">640×480, cerca de 10 quadros por segundo. Bom equilíbrio.</string>
     <string name="quality_high_hint">1280×720, cerca de 10 quadros por segundo. Use com Wi-Fi bom.</string>
-
-    <string name="image_locked_hint">Pare a câmera para mudar a imagem.</string>
-
-    <!-- Detecção de movimento -->
     <string name="motion_title">Detecção de movimento</string>
     <string name="motion_sensitivity_label">Sensibilidade</string>
-    <string name="motion_on_hint">Ao detectar movimento, a câmera guarda uma foto e envia um alerta para os navegadores onde você ativou os alertas no site.</string>
+    <string name="motion_on_hint">Guarda uma foto e envia um alerta aos navegadores com alertas ativados no site.</string>
     <string name="motion_off_hint">Desligada: nenhum movimento é registrado.</string>
-    <string name="motion_locked_hint">Pare a câmera para mudar a detecção.</string>
+    <string name="account_title">Conta</string>
+    <string name="sign_out">Sair da conta neste aparelho</string>
+    <string name="sign_out_running_hint">Pare a câmera para sair da conta.</string>
 
     <!-- Proteção por PIN -->
     <string name="protection_title">Proteção</string>
     <string name="protection_off">Sem PIN, qualquer pessoa com acesso ao celular pode parar a câmera.</string>
-    <string name="protection_on">PIN ativo. Ele é pedido para parar a câmera, sair da conta e mudar a imagem durante a transmissão.</string>
+    <string name="protection_on">PIN ativo: ele é pedido para parar a câmera e para abrir as configurações.</string>
     <string name="pin_set">Definir PIN</string>
     <string name="pin_change">Alterar PIN</string>
     <string name="pin_remove">Remover PIN</string>
@@ -73,11 +78,6 @@
     <string name="pin_removed">PIN removido.</string>
     <string name="dialog_ok">OK</string>
     <string name="dialog_cancel">Cancelar</string>
-
-    <!-- Economia de bateria -->
-    <string name="battery_title">Deixe a câmera funcionar em segundo plano</string>
-    <string name="battery_detail">Com a economia de bateria ativa, o Android pode encerrar a transmissão com a tela apagada.</string>
-    <string name="battery_button">Permitir</string>
 
     <!-- Login -->
     <string name="login_title">Entrar</string>
@@ -99,13 +99,12 @@
     <string name="recovery_title">Guarde os códigos de recuperação</string>
     <string name="recovery_done_button">Já guardei os códigos</string>
     <string name="recovery_prompt">Use um destes códigos se perder o app autenticador. Cada um vale uma vez e eles não serão mostrados de novo.\n\n%1$s</string>
-    <string name="sign_out">Sair da conta neste aparelho</string>
 
     <!-- Notificação -->
     <string name="notif_channel">Transmissão da câmera</string>
     <string name="notif_title">Câmera ativa</string>
     <string name="notif_connecting">Conectando ao servidor…</string>
-    <string name="notif_ready">Pronta, aguardando alguém assistir</string>
+    <string name="notif_ready">Vigiando, ninguém assistindo</string>
     <string name="notif_live">Ao vivo</string>
     <string name="notif_stop">Parar</string>
     <string name="notif_resume_title">Câmera pausada</string>

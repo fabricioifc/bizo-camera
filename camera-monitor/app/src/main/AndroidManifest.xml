@@ -25,6 +25,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
         <!-- Volta a transmitir após reiniciar o celular ou atualizar o app -->
         <receiver
             android:name=".BootReceiver"
