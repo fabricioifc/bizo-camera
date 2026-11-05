@@ -152,10 +152,12 @@ frontend/
   index.html
   public/          service worker e ícones, copiados como estão para dist/
   src/
-    App.vue        navegação entre as telas
+    App.vue        navegação entre as telas e estado da sessão
+    layouts/       AuthLayout (cartão centralizado, sem login) e AppLayout (barra lateral; gaveta no celular)
     views/         telas: login, código 2FA, segurança, lista de câmeras, câmera ao vivo
-    components/    partes das telas
-    lib/           chamadas à API, formatação, Web Push
+    components/    barra lateral, cabeçalho de tela, ícones, tema, cartão da câmera, alertas, movimentos
+    lib/           chamadas à API, formatação, Web Push, tema claro/escuro
+    styles.css     tokens de cor dos dois temas e todo o visual
   vite.config.js
 ```
 

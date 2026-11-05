@@ -1,28 +1,20 @@
 <script setup>
 import { onMounted, ref } from 'vue';
+import AppIcon from './AppIcon.vue';
 import { errorText, post } from '../lib/api.js';
 import { base64UrlToBytes, serviceWorker } from '../lib/push.js';
 
 // Alertas de movimento por Web Push neste navegador.
 const registration = ref(null);
-const text = ref('');
-const buttonText = ref('');
+const subscribed = ref(false);
 const blocked = ref(false);
 const busy = ref(false);
+const error = ref('');
 
 async function refresh() {
   if (!registration.value) return;
-  const subscription = await registration.value.pushManager.getSubscription();
+  subscribed.value = Boolean(await registration.value.pushManager.getSubscription());
   blocked.value = Notification.permission === 'denied';
-  if (blocked.value) {
-    text.value = 'Alertas bloqueados nas configurações do navegador.';
-  } else if (subscription) {
-    text.value = 'Alertas de movimento ativados neste aparelho.';
-    buttonText.value = 'Desativar';
-  } else {
-    text.value = 'Receba um aviso neste aparelho quando houver movimento.';
-    buttonText.value = 'Ativar alertas';
-  }
 }
 
 async function subscribe() {
@@ -39,22 +31,21 @@ async function subscribe() {
 
 async function toggle() {
   busy.value = true;
-  let error = '';
+  error.value = '';
   try {
     const current = await registration.value.pushManager.getSubscription();
     if (current) {
       await post('/api/push/unsubscribe', { endpoint: current.endpoint });
       await current.unsubscribe();
     } else if ((await Notification.requestPermission()) === 'granted') {
-      error = await subscribe();
+      error.value = await subscribe();
     }
   } catch {
-    error = 'Não foi possível mudar os alertas neste navegador.';
+    error.value = 'Não foi possível mudar os alertas neste navegador.';
   } finally {
     busy.value = false;
   }
   await refresh();
-  if (error) text.value = error;
 }
 
 onMounted(async () => {
@@ -64,8 +55,24 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div v-if="registration" class="alerts">
-    <span class="hint">{{ text }}</span>
-    <button type="button" class="secondary" :hidden="blocked" :disabled="busy" @click="toggle">{{ buttonText }}</button>
-  </div>
+  <section v-if="registration" class="card alerts-card" aria-label="Alertas de movimento">
+    <span class="alerts-icon"><AppIcon name="bell" /></span>
+    <div class="alerts-text">
+      <strong>Alertas de movimento</strong>
+      <p v-if="error" class="small text-danger">{{ error }}</p>
+      <p v-else-if="blocked" class="small muted">Bloqueados nas configurações do navegador.</p>
+      <p v-else-if="subscribed" class="small muted">Ativados neste aparelho.</p>
+      <p v-else class="small muted">Receba um aviso neste aparelho quando houver movimento.</p>
+    </div>
+    <button
+      v-if="!blocked"
+      type="button"
+      class="btn"
+      :class="subscribed ? 'btn-secondary' : 'btn-primary'"
+      :disabled="busy"
+      @click="toggle"
+    >
+      {{ subscribed ? 'Desativar' : 'Ativar alertas' }}
+    </button>
+  </section>
 </template>

@@ -1,16 +1,18 @@
 <script setup>
 import { onMounted, ref } from 'vue';
+import AppIcon from '../components/AppIcon.vue';
+import PageHeader from '../components/PageHeader.vue';
 import StatusMessage from '../components/StatusMessage.vue';
 import { api, ensureOk, post } from '../lib/api.js';
 
 defineProps({ pendingSetup: Boolean });
-// account: dados da conta carregados; unauthorized: sessão expirou; done: 2FA ativado; back: voltar à lista.
-const emit = defineEmits(['account', 'unauthorized', 'done', 'back']);
+// account: dados da conta carregados; unauthorized: sessão expirou; done: 2FA ativado.
+const emit = defineEmits(['account', 'unauthorized', 'done']);
 
 const account = ref(null);
-const status = ref('Carregando…');
+const loadError = ref('');
 const message = ref('');
-const messageError = ref(false);
+const messageKind = ref('info');
 const busy = ref(false);
 
 const setupQr = ref('');
@@ -19,9 +21,9 @@ const enableCode = ref('');
 const disableCode = ref('');
 const recoveryCodes = ref([]);
 
-function setMessage(text, isError = false) {
+function setMessage(text, kind = 'info') {
   message.value = text;
-  messageError.value = isError;
+  messageKind.value = kind;
 }
 
 async function load() {
@@ -32,10 +34,10 @@ async function load() {
       return;
     }
     account.value = await response.json();
+    loadError.value = '';
     emit('account', account.value);
-    status.value = `Conta: ${account.value.email}. Verificação em duas etapas ${account.value.twoFactor ? 'ativa' : 'desativada'}.`;
   } catch {
-    status.value = 'Não foi possível carregar os dados da conta.';
+    loadError.value = 'Não foi possível carregar os dados da conta.';
   }
 }
 
@@ -46,7 +48,7 @@ async function run(action) {
   try {
     await action();
   } catch (error) {
-    setMessage(error.message, true);
+    setMessage(error.message, 'error');
   } finally {
     busy.value = false;
   }
@@ -68,54 +70,130 @@ const disableTwoFactor = () => run(async () => {
   await ensureOk(await post('/api/account/2fa/disable', { code: disableCode.value.trim() }));
   disableCode.value = '';
   await load();
-  setMessage('Verificação em duas etapas desativada.');
+  setMessage('Verificação em duas etapas desativada.', 'success');
 });
 
 onMounted(load);
 </script>
 
 <template>
-  <section class="panel">
-    <h2>Segurança da conta</h2>
-    <p v-if="pendingSetup" class="hint">Para usar o monitor, ative a verificação em duas etapas agora.</p>
-    <p class="hint">{{ status }}</p>
+  <PageHeader title="Segurança">
+    <template #subtitle>Conta e verificação em duas etapas</template>
+  </PageHeader>
 
-    <div v-if="account && !account.twoFactor">
-      <div v-if="recoveryCodes.length">
-        <p class="hint"><strong>Guarde estes códigos de recuperação.</strong> Cada um vale uma vez e não serão mostrados de novo.</p>
-        <ul class="codes">
-          <li v-for="code in recoveryCodes" :key="code">{{ code }}</li>
-        </ul>
-        <div class="actions">
-          <button type="button" @click="$emit('done')">Já guardei</button>
+  <div class="security">
+    <StatusMessage
+      v-if="pendingSetup"
+      kind="warning"
+      text="Para acessar as câmeras, ative a verificação em duas etapas."
+    />
+    <StatusMessage :text="loadError" kind="error" />
+
+    <section v-if="account" class="card">
+      <div class="card-header"><h2>Conta</h2></div>
+      <dl class="rows">
+        <div class="row">
+          <dt>E-mail</dt>
+          <dd>{{ account.email }}</dd>
+        </div>
+        <div class="row">
+          <dt>Login</dt>
+          <dd>{{ account.google ? 'Conta Google' : 'Senha' }}</dd>
+        </div>
+        <div class="row">
+          <dt>Verificação em duas etapas</dt>
+          <dd>
+            <span class="pill" :class="account.twoFactor ? 'success' : 'warning'">
+              {{ account.twoFactor ? 'Ativa' : 'Desativada' }}
+            </span>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section v-if="account" class="card">
+      <div class="card-header">
+        <div>
+          <h2>Verificação em duas etapas</h2>
+          <p class="small muted">Um código do app autenticador é pedido a cada login, além do Google.</p>
         </div>
       </div>
-      <div v-else-if="setupQr">
-        <p class="hint">Escaneie o QR code com seu app autenticador (Google Authenticator, Authy, 1Password…) ou digite a chave manualmente.</p>
-        <img :src="setupQr" alt="QR code do 2FA" width="220" height="220">
-        <p class="hint">Chave: <code>{{ setupSecret }}</code></p>
-        <form @submit.prevent="enableTwoFactor">
-          <input v-model="enableCode" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" maxlength="6" required>
-          <div class="actions">
-            <button type="submit" :disabled="busy">Confirmar e ativar</button>
+
+      <div class="card-body stack">
+        <!-- 3) Códigos de recuperação, logo depois de ativar -->
+        <template v-if="recoveryCodes.length">
+          <StatusMessage kind="success" text="Verificação em duas etapas ativada." />
+          <div>
+            <strong>Guarde estes códigos de recuperação.</strong>
+            <p class="muted">Cada um vale uma vez e entra no lugar do código do app, se você perder o celular. Eles não serão mostrados de novo.</p>
+            <ul class="codes">
+              <li v-for="code in recoveryCodes" :key="code">{{ code }}</li>
+            </ul>
+            <button type="button" class="btn btn-primary" @click="$emit('done')">
+              <AppIcon name="check" :size="16" />
+              Já guardei
+            </button>
           </div>
+        </template>
+
+        <!-- 2) QR code e confirmação -->
+        <ol v-else-if="setupQr" class="steps">
+          <li>
+            <div>
+              <strong>Escaneie o QR code</strong>
+              <p class="muted">No Google Authenticator, Authy, 1Password ou outro app autenticador.</p>
+              <img class="qr" :src="setupQr" alt="QR code da verificação em duas etapas" width="200" height="200">
+              <p class="small muted">Ou digite a chave: <code class="secret">{{ setupSecret }}</code></p>
+            </div>
+          </li>
+          <li>
+            <form class="form code-form" @submit.prevent="enableTwoFactor">
+              <div class="field">
+                <label for="enable-code">Digite o código que aparece no app</label>
+                <input
+                  id="enable-code"
+                  v-model="enableCode"
+                  class="input input-code"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  placeholder="000000"
+                  maxlength="6"
+                  required
+                >
+              </div>
+              <button type="submit" class="btn btn-primary" :disabled="busy">Confirmar e ativar</button>
+            </form>
+          </li>
+        </ol>
+
+        <!-- Ativa: desativar com um código -->
+        <form v-else-if="account.twoFactor" class="form code-form" @submit.prevent="disableTwoFactor">
+          <div class="field">
+            <label for="disable-code">Para desativar, informe um código do app ou de recuperação</label>
+            <input
+              id="disable-code"
+              v-model="disableCode"
+              class="input"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              required
+            >
+          </div>
+          <button type="submit" class="btn btn-danger" :disabled="busy">Desativar verificação em duas etapas</button>
         </form>
-      </div>
-      <button v-else type="button" :disabled="busy" @click="startSetup">
-        Ativar verificação em duas etapas
-      </button>
-    </div>
 
-    <form v-else-if="account" @submit.prevent="disableTwoFactor">
-      <input v-model="disableCode" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Código do app ou de recuperação" required>
-      <div class="actions">
-        <button type="submit" class="danger" :disabled="busy">Desativar verificação em duas etapas</button>
-      </div>
-    </form>
+        <!-- 1) Desativada: começar -->
+        <div v-else>
+          <button type="button" class="btn btn-primary" :disabled="busy" @click="startSetup">
+            <AppIcon name="shield-check" :size="18" />
+            Ativar verificação em duas etapas
+          </button>
+        </div>
 
-    <StatusMessage :text="message" :error="messageError" />
-    <div v-if="!pendingSetup" class="actions">
-      <button type="button" class="secondary" @click="$emit('back')">← Voltar</button>
-    </div>
-  </section>
+        <StatusMessage :text="message" :kind="messageKind" />
+      </div>
+    </section>
+  </div>
 </template>

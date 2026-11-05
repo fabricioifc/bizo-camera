@@ -1,7 +1,9 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import AppIcon from '../components/AppIcon.vue';
 import HealthInfo from '../components/HealthInfo.vue';
 import MotionEvents from '../components/MotionEvents.vue';
+import PageHeader from '../components/PageHeader.vue';
 import { api } from '../lib/api.js';
 
 const RECONNECT_MS = 3000;
@@ -11,10 +13,19 @@ const props = defineProps({ device: { type: Object, required: true } });
 const emit = defineEmits(['back', 'rejected']);
 
 const health = ref(props.device.health);
+const online = ref(props.device.online);
+const connected = ref(false);
 const status = ref('Conectando…');
 const frameUrl = ref('');
 const events = ref([]);
 const eventsLoaded = ref(false);
+
+const pill = computed(() => {
+  if (!connected.value) return { text: 'Conectando', kind: 'warning' };
+  if (!online.value) return { text: 'Offline', kind: '' };
+  if (frameUrl.value) return { text: 'Ao vivo', kind: 'danger live' };
+  return { text: 'Aguardando imagem', kind: 'warning' };
+});
 
 let socket = null;
 let retryTimer = null;
@@ -26,6 +37,11 @@ function showFrame(data) {
   status.value = '';
 }
 
+function clearFrame() {
+  if (frameUrl.value) URL.revokeObjectURL(frameUrl.value);
+  frameUrl.value = '';
+}
+
 function handleMessage(text) {
   let message;
   try {
@@ -34,9 +50,11 @@ function handleMessage(text) {
     return;
   }
   if (message.type === 'status') {
+    online.value = message.online;
     if (!message.online) {
       status.value = 'Câmera offline. Aguardando conexão…';
       health.value = null;
+      clearFrame();
     } else if (!frameUrl.value) {
       status.value = 'Conectado. Aguardando imagem…';
     }
@@ -52,11 +70,15 @@ function connect() {
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   socket = new WebSocket(`${scheme}://${location.host}/ws/view?device=${encodeURIComponent(props.device.id)}`);
   socket.binaryType = 'arraybuffer';
+  socket.onopen = () => {
+    connected.value = true;
+  };
   socket.onmessage = (event) => {
     if (typeof event.data === 'string') handleMessage(event.data);
     else showFrame(event.data);
   };
   socket.onclose = (event) => {
+    connected.value = false;
     if (closed) return;
     if (event.code === 1008) {
       emit('rejected');
@@ -92,21 +114,31 @@ onBeforeUnmount(() => {
   closed = true;
   clearTimeout(retryTimer);
   if (socket) socket.close();
-  if (frameUrl.value) URL.revokeObjectURL(frameUrl.value);
+  clearFrame();
 });
 </script>
 
 <template>
-  <section>
-    <div class="viewer-top">
-      <button type="button" class="secondary" @click="$emit('back')">← Voltar</button>
-      <strong>{{ device.name }}</strong>
+  <PageHeader :title="device.name">
+    <template #leading>
+      <button type="button" class="btn btn-secondary btn-icon" title="Voltar às câmeras" aria-label="Voltar às câmeras" @click="$emit('back')">
+        <AppIcon name="back" />
+      </button>
+    </template>
+    <template #subtitle>
+      <span class="pill" :class="pill.kind">{{ pill.text }}</span>
       <HealthInfo :health="health" />
-    </div>
+    </template>
+  </PageHeader>
+
+  <div class="viewer">
     <div class="stage">
-      <img v-if="frameUrl" id="frame" :src="frameUrl" alt="Transmissão ao vivo">
-      <p v-else class="hint">{{ status }}</p>
+      <img v-if="frameUrl" :src="frameUrl" alt="Transmissão ao vivo">
+      <div v-else class="stage-status">
+        <AppIcon name="camera" :size="36" />
+        <span>{{ status }}</span>
+      </div>
     </div>
     <MotionEvents :events="events" :loaded="eventsLoaded" />
-  </section>
+  </div>
 </template>

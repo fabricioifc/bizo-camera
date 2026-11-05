@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
-import AppHeader from './components/AppHeader.vue';
+import AppLayout from './layouts/AppLayout.vue';
+import AuthLayout from './layouts/AuthLayout.vue';
 import DeviceListView from './views/DeviceListView.vue';
 import LoginView from './views/LoginView.vue';
 import MfaView from './views/MfaView.vue';
@@ -9,24 +10,23 @@ import ViewerView from './views/ViewerView.vue';
 import { api, MESSAGES } from './lib/api.js';
 import { serviceWorker } from './lib/push.js';
 
-// Telas: auth, mfa, security, list, viewer. Cada tela cuida dos próprios dados;
-// aqui ficam só a navegação e o estado da sessão.
-const view = ref('auth');
+// Telas: auth e mfa (sem login, cartão centralizado); list, viewer e security (com a barra lateral).
+// Cada tela cuida dos próprios dados; aqui ficam só a navegação e o estado da sessão.
+const view = ref('loading');
 const connectionOk = ref(false);
-const signedIn = ref(false);
 const pendingSetup = ref(false);
+const email = ref('');
 const mfaToken = ref(null);
 const openCameraId = ref(null);
 const viewerDevice = ref(null);
 const authMessage = ref('');
 const authError = ref(false);
 
-const showLogout = computed(() => signedIn.value && !['auth', 'mfa'].includes(view.value));
-const showSecurityButton = computed(() => signedIn.value && !pendingSetup.value && view.value === 'list');
+const section = computed(() => (view.value === 'security' ? 'security' : 'cameras'));
 
 function showAuth(message = '', isError = false) {
-  signedIn.value = false;
   pendingSetup.value = false;
+  email.value = '';
   mfaToken.value = null;
   viewerDevice.value = null;
   authMessage.value = message;
@@ -44,8 +44,12 @@ function showList() {
     showSecurity();
     return;
   }
-  signedIn.value = true;
   view.value = 'list';
+}
+
+function navigate(target) {
+  if (target === 'security') showSecurity();
+  else showList();
 }
 
 function openViewer(device) {
@@ -54,7 +58,7 @@ function openViewer(device) {
 }
 
 function setAccount(account) {
-  signedIn.value = true;
+  email.value = account.email;
   pendingSetup.value = account.pending;
 }
 
@@ -65,6 +69,23 @@ function requireSetup() {
 
 function finishSetup() {
   pendingSetup.value = false;
+  showList();
+}
+
+/** Carrega a conta da sessão atual. Devolve false se não houver sessão. */
+async function loadAccount() {
+  const response = await api('/api/auth/me');
+  if (!response.ok) return false;
+  setAccount(await response.json());
+  return true;
+}
+
+async function afterMfa() {
+  try {
+    await loadAccount();
+  } catch {
+    // A lista mostra o erro de conexão.
+  }
   showList();
 }
 
@@ -107,9 +128,7 @@ async function initialize() {
   }
 
   try {
-    const response = await api('/api/auth/me');
-    if (response.ok) {
-      setAccount(await response.json());
+    if (await loadAccount()) {
       showList();
       return;
     }
@@ -125,32 +144,32 @@ onMounted(initialize);
 </script>
 
 <template>
-  <AppHeader
-    :connection-ok="connectionOk"
-    :show-security="showSecurityButton"
-    :show-logout="showLogout"
-    @security="showSecurity"
-    @logout="logout"
-  />
-
-  <main>
+  <AuthLayout v-if="view === 'auth' || view === 'mfa'">
     <LoginView v-if="view === 'auth'" :message="authMessage" :error="authError" />
-
     <MfaView
-      v-else-if="view === 'mfa'"
+      v-else
       :mfa-token="mfaToken"
-      @done="showList"
+      @done="afterMfa"
       @expired="showAuth(MESSAGES.mfa_expired, true)"
       @cancel="showAuth()"
     />
+  </AuthLayout>
 
+  <AppLayout
+    v-else-if="view !== 'loading'"
+    :section="section"
+    :pending-setup="pendingSetup"
+    :email="email"
+    :connection-ok="connectionOk"
+    @navigate="navigate"
+    @logout="logout"
+  >
     <SecurityView
-      v-else-if="view === 'security'"
+      v-if="view === 'security'"
       :pending-setup="pendingSetup"
       @account="setAccount"
       @unauthorized="showAuth()"
       @done="finishSetup"
-      @back="showList"
     />
 
     <DeviceListView
@@ -169,5 +188,5 @@ onMounted(initialize);
       @back="showList"
       @rejected="showList"
     />
-  </main>
+  </AppLayout>
 </template>

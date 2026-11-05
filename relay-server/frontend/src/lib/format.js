@@ -1,16 +1,21 @@
 const LOW_BATTERY = 20;
 
-export function healthText(health) {
-  if (!health) return '';
-  const parts = [];
-  if (health.battery !== null) parts.push(`Bateria ${health.battery}%${health.charging ? ' (carregando)' : ''}`);
-  if (health.temperature !== null) parts.push(`${Math.round(health.temperature)} °C`);
-  if (health.throttled) parts.push('quente, qualidade reduzida');
-  return parts.join(' · ');
-}
-
-export function healthWarn(health) {
-  return Boolean(health && ((health.battery !== null && health.battery < LOW_BATTERY && !health.charging) || health.throttled));
+/** Saúde do aparelho em etiquetas: bateria, temperatura e aviso de superaquecimento. */
+export function healthChips(health) {
+  if (!health) return [];
+  const chips = [];
+  if (health.battery !== null) {
+    chips.push({
+      icon: 'battery',
+      text: `${health.battery}%${health.charging ? ' · carregando' : ''}`,
+      warn: health.battery < LOW_BATTERY && !health.charging,
+    });
+  }
+  if (health.temperature !== null) {
+    chips.push({ icon: 'thermometer', text: `${Math.round(health.temperature)} °C`, warn: health.throttled });
+  }
+  if (health.throttled) chips.push({ icon: 'alert', text: 'Quente, qualidade reduzida', warn: true });
+  return chips;
 }
 
 export function formatWhen(at) {

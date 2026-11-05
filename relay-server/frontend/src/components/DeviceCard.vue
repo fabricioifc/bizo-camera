@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
+import AppIcon from './AppIcon.vue';
 import HealthInfo from './HealthInfo.vue';
 import { api, ensureOk } from '../lib/api.js';
 import { formatWhen } from '../lib/format.js';
@@ -10,6 +11,7 @@ const emit = defineEmits(['open', 'changed']);
 
 const editing = ref(false);
 const name = ref('');
+const nameInput = ref(null);
 const busy = ref(false);
 const error = ref('');
 
@@ -17,10 +19,12 @@ function deviceUrl() {
   return `/api/devices/${encodeURIComponent(props.device.id)}`;
 }
 
-function beginRename() {
+async function beginRename() {
   name.value = props.device.name;
   error.value = '';
   editing.value = true;
+  await nextTick();
+  nameInput.value?.select();
 }
 
 async function run(request) {
@@ -48,24 +52,48 @@ function remove() {
 </script>
 
 <template>
-  <article class="card">
-    <div class="card-top">
-      <span class="dot" :class="device.online ? 'on' : 'off'"></span>
-      <strong>{{ device.name }}</strong>
+  <article class="card device">
+    <div class="device-top">
+      <span class="device-icon" :class="{ online: device.online }"><AppIcon name="camera" /></span>
+      <div class="device-title">
+        <form v-if="editing" class="rename" @submit.prevent="saveName" @keydown.esc="editing = false">
+          <input ref="nameInput" v-model="name" class="input" type="text" maxlength="40" aria-label="Nome da câmera" required>
+          <button type="submit" class="btn btn-primary btn-icon" :disabled="busy" title="Salvar" aria-label="Salvar">
+            <AppIcon name="check" />
+          </button>
+          <button type="button" class="btn btn-ghost btn-icon" title="Cancelar" aria-label="Cancelar" @click="editing = false">
+            <AppIcon name="close" />
+          </button>
+        </form>
+        <template v-else>
+          <strong :title="device.name">{{ device.name }}</strong>
+          <span class="pill" :class="device.online ? 'success' : ''">{{ device.online ? 'Online' : 'Offline' }}</span>
+        </template>
+      </div>
+      <div v-if="!editing" class="device-tools">
+        <button type="button" class="btn btn-ghost btn-icon" title="Renomear" aria-label="Renomear" @click="beginRename">
+          <AppIcon name="edit" :size="18" />
+        </button>
+        <button type="button" class="btn btn-ghost btn-icon" title="Remover" aria-label="Remover" :disabled="busy" @click="remove">
+          <AppIcon name="trash" :size="18" />
+        </button>
+      </div>
     </div>
-    <span class="hint">{{ device.online ? 'Online' : 'Offline' }}</span>
-    <HealthInfo :health="device.health" />
-    <span v-if="device.lastMotionAt" class="hint">Último movimento: {{ formatWhen(device.lastMotionAt) }}</span>
-    <button :disabled="!device.online" @click="$emit('open', device)">Assistir</button>
-    <div class="actions device-actions">
-      <button type="button" class="secondary" @click="beginRename">Renomear</button>
-      <button type="button" class="danger" :disabled="busy" @click="remove">Remover</button>
+
+    <div class="device-body">
+      <HealthInfo :health="device.health" />
+      <span class="device-meta muted">
+        <AppIcon name="motion" :size="16" />
+        {{ device.lastMotionAt ? `Último movimento ${formatWhen(device.lastMotionAt)}` : 'Nenhum movimento registrado' }}
+      </span>
+      <p v-if="error" class="small text-danger" role="alert">{{ error }}</p>
     </div>
-    <form v-if="editing" class="device-rename-form" @submit.prevent="saveName">
-      <input v-model="name" type="text" maxlength="40" aria-label="Nome da câmera" required>
-      <button type="submit" :disabled="busy">Salvar</button>
-      <button type="button" class="secondary" @click="editing = false">Cancelar</button>
-    </form>
-    <span v-if="error" class="hint device-message error">{{ error }}</span>
+
+    <div class="device-footer">
+      <button type="button" class="btn btn-primary btn-block" :disabled="!device.online" @click="$emit('open', device)">
+        <AppIcon name="play" :size="16" />
+        {{ device.online ? 'Assistir' : 'Câmera offline' }}
+      </button>
+    </div>
   </article>
 </template>

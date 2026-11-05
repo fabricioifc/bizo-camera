@@ -8,10 +8,11 @@ defineProps({
 </script>
 
 <template>
-  <section class="panel">
-    <h2>Entrar</h2>
-    <p class="hint">Entre com sua conta Google. Depois, confirme o código de verificação em duas etapas.</p>
-    <a class="button google" href="/api/auth/google/start">Entrar com Google</a>
-    <StatusMessage :text="message" :error="error" />
-  </section>
+  <h2>Entrar</h2>
+  <p class="muted">Use sua conta Google. Depois, confirme com o código de verificação em duas etapas.</p>
+  <a class="btn btn-google btn-block" href="/api/auth/google/start">
+    <span class="g" aria-hidden="true">G</span>
+    Entrar com Google
+  </a>
+  <StatusMessage :text="message" :kind="error ? 'error' : 'info'" />
 </template>

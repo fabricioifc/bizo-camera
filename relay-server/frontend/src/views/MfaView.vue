@@ -13,6 +13,7 @@ const busy = ref(false);
 async function submit() {
   if (!code.value.trim()) return;
   busy.value = true;
+  message.value = '';
   try {
     const response = await post('/api/auth/mfa', { mfaToken: props.mfaToken, code: code.value.trim() });
     if (response.ok) {
@@ -31,16 +32,26 @@ async function submit() {
 </script>
 
 <template>
-  <section class="panel">
-    <h2>Código de verificação</h2>
-    <p class="hint">Digite o código de 6 números do seu app autenticador, ou um código de recuperação.</p>
-    <form @submit.prevent="submit">
-      <input v-model="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" maxlength="9" required>
-      <div class="actions">
-        <button type="submit" :disabled="busy">Confirmar</button>
-        <button type="button" class="secondary" :disabled="busy" @click="$emit('cancel')">Cancelar</button>
-      </div>
-    </form>
-    <StatusMessage :text="message" error />
-  </section>
+  <h2>Código de verificação</h2>
+  <p class="muted">Digite os 6 números do seu app autenticador ou um código de recuperação.</p>
+  <form class="form" @submit.prevent="submit">
+    <div class="field">
+      <label for="mfa-code" class="sr-only">Código</label>
+      <input
+        id="mfa-code"
+        v-model="code"
+        class="input input-code"
+        type="text"
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        placeholder="000000"
+        maxlength="9"
+        autofocus
+        required
+      >
+    </div>
+    <button type="submit" class="btn btn-primary btn-block" :disabled="busy">Confirmar</button>
+    <button type="button" class="btn btn-ghost btn-block" :disabled="busy" @click="$emit('cancel')">Voltar ao login</button>
+  </form>
+  <StatusMessage :text="message" kind="error" />
 </template>
