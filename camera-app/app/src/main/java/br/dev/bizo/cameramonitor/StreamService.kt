@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -21,8 +22,10 @@ import android.util.Log
 import android.util.Range
 import android.view.OrientationEventListener
 import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -114,7 +117,7 @@ class StreamService : LifecycleService() {
     // noturno): a imagem clareando não conta como movimento.
     @Volatile private var motionGraceUntil = 0L
 
-    // Foco, mostrado no site: "auto", "focusing", "locked", "failed" ou "unavailable" (lente sem ajuste).
+    // Foco, mostrado no site: "auto", "focusing", "locked", "far", "failed" ou "unavailable" (lente sem ajuste).
     private var focusState = FOCUS_AUTO
 
     // Configuração alterada no app ou pelo site. Lente ou qualidade: troca a câmera sem parar a transmissão.
@@ -180,6 +183,7 @@ class StreamService : LifecycleService() {
         RelayClient.focusHandler = { text ->
             when (runCatching { JSONObject(text).getString("mode") }.getOrNull()) {
                 "lock" -> handler.post { focusNow() }
+                "far" -> handler.post { focusFar() }
                 "auto" -> handler.post { focusAutomatic() }
             }
         }
@@ -341,8 +345,13 @@ class StreamService : LifecycleService() {
             }
             this.camera = camera
             this.analysis = analysis
-            // Câmera religada: o foco fixado se perde e volta ao automático.
-            focusState = FOCUS_AUTO
+            // Câmera religada: o foco fixado no centro se perde; o foco longe fica salvo e volta.
+            focusState = if (CameraSettings.focusFar(this) && supportsFarFocus(camera)) {
+                applyFarFocus(camera)
+                FOCUS_FAR
+            } else {
+                FOCUS_AUTO
+            }
             camera.cameraControl.setZoomRatio(choice.ratio)
             applyExposure(camera, night)
             // Câmera ou enquadramento novos: a próxima comparação de movimento recomeça do zero.
@@ -467,11 +476,10 @@ class StreamService : LifecycleService() {
     }
 
     // "Focar agora": foca no centro da imagem e mantém esse foco, sem o autofoco ficar procurando.
-    // No modo noturno, a lanterna (se houver) acende só durante o foco, porque no escuro o
-    // autofoco não enxerga contraste.
     private fun focusNow() {
         val current = camera ?: return
         if (focusState == FOCUS_FOCUSING) return
+        clearFarFocus(current)
         val point = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f)
         val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF).disableAutoCancel().build()
         if (!current.cameraInfo.isFocusMeteringSupported(action)) {
@@ -479,20 +487,13 @@ class StreamService : LifecycleService() {
             return
         }
         setFocusState(FOCUS_FOCUSING)
-        // A imagem muda durante o foco (e com a lanterna): isso não conta como movimento.
+        // A imagem muda durante o foco: isso não conta como movimento.
         motionGraceUntil = System.currentTimeMillis() + FOCUS_MAX_MS
-        val assist = CameraSettings.night(this) && current.cameraInfo.hasFlashUnit() && !CameraSettings.torch(this)
-        if (assist) current.cameraControl.enableTorch(true)
-        handler.postDelayed({ runFocus(current, action, assist) }, if (assist) TORCH_WARMUP_MS else 0L)
-    }
-
-    private fun runFocus(target: Camera, action: FocusMeteringAction, assist: Boolean) {
-        if (camera !== target) return // a câmera foi religada nesse meio-tempo
+        val target = current
         val result = target.cameraControl.startFocusAndMetering(action)
         result.addListener({
             if (camera !== target) return@addListener
             val focused = runCatching { result.get().isFocusSuccessful }.getOrDefault(false)
-            if (assist) applyTorch()
             motionGraceUntil = System.currentTimeMillis() + EXPOSURE_SETTLE_MS
             // Sem sucesso, não deixa um foco ruim preso: volta ao automático.
             if (!focused) target.cameraControl.cancelFocusAndMetering()
@@ -500,11 +501,53 @@ class StreamService : LifecycleService() {
         }, ContextCompat.getMainExecutor(this))
     }
 
+    // "Focar longe": deixa a lente no infinito, sem autofoco. É o que funciona à noite e atrás de
+    // vidro, onde o autofoco não enxerga contraste ou mira o reflexo. Fica salvo no aparelho.
+    private fun focusFar() {
+        val current = camera ?: return
+        if (focusState == FOCUS_FOCUSING) return
+        if (!supportsFarFocus(current)) {
+            setFocusState(FOCUS_UNAVAILABLE)
+            return
+        }
+        current.cameraControl.cancelFocusAndMetering()
+        CameraSettings.setFocusFar(this, true)
+        applyFarFocus(current)
+        setFocusState(FOCUS_FAR)
+    }
+
     private fun focusAutomatic() {
         val current = camera ?: return
         if (focusState == FOCUS_FOCUSING) return
         current.cameraControl.cancelFocusAndMetering()
+        clearFarFocus(current)
         setFocusState(FOCUS_AUTO)
+    }
+
+    // A lente precisa ter ajuste de foco (distância mínima acima de 0) e aceitar autofoco desligado.
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun supportsFarFocus(target: Camera): Boolean {
+        val info = Camera2CameraInfo.from(target.cameraInfo)
+        val minimum = info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
+        val modes = info.getCameraCharacteristic(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES) ?: intArrayOf()
+        return minimum > 0f && CameraMetadata.CONTROL_AF_MODE_OFF in modes
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun applyFarFocus(target: Camera) {
+        motionGraceUntil = System.currentTimeMillis() + EXPOSURE_SETTLE_MS
+        // Na Camera2, a distância é medida em dioptrias: 0 é o infinito.
+        val options = CaptureRequestOptions.Builder()
+            .setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF)
+            .setCaptureRequestOption(CaptureRequest.LENS_FOCUS_DISTANCE, 0f)
+            .build()
+        Camera2CameraControl.from(target.cameraControl).setCaptureRequestOptions(options)
+    }
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun clearFarFocus(target: Camera) {
+        CameraSettings.setFocusFar(this, false)
+        Camera2CameraControl.from(target.cameraControl).clearCaptureRequestOptions()
     }
 
     private fun setFocusState(state: String) {
@@ -654,13 +697,13 @@ class StreamService : LifecycleService() {
         private const val GRID_ROWS = 24
         private const val EXPOSURE_SETTLE_MS = 3_000L
 
-        // Foco: estados informados ao site, tempo para a lanterna clarear a cena e limite da operação.
+        // Foco: estados informados ao site e limite da operação.
         private const val FOCUS_AUTO = "auto"
         private const val FOCUS_FOCUSING = "focusing"
         private const val FOCUS_LOCKED = "locked"
+        private const val FOCUS_FAR = "far"
         private const val FOCUS_FAILED = "failed"
         private const val FOCUS_UNAVAILABLE = "unavailable"
-        private const val TORCH_WARMUP_MS = 600L
         private const val FOCUS_MAX_MS = 8_000L
 
         @Volatile

@@ -13,7 +13,7 @@ const CHOICES = {
 // video: gravar o vídeo curto do movimento; night: modo noturno (exposição e tela apagada).
 const FLAGS = ['motion', 'torch', 'video', 'night'];
 // Estado do foco informado pela câmera; é só leitura (o site pede o foco por outra mensagem).
-const FOCUS_STATES = ['auto', 'focusing', 'locked', 'failed', 'unavailable'];
+const FOCUS_STATES = ['auto', 'focusing', 'locked', 'far', 'failed', 'unavailable'];
 
 // Zoom: número entre 0,1 e 20, com uma casa decimal (abaixo de 1 usa a grande-angular, se houver).
 function zoomValue(value) {

@@ -17,7 +17,9 @@ O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valor
 
 O autofoco roda sozinho, mas no escuro ele pode ficar procurando e deixar a imagem desfocada. No cartão **Controles**, **Focar agora** foca no que está no centro da imagem e mantém esse foco fixo, sem ficar procurando. Ele continua fixo até você tocar em **Voltar ao automático** ou a câmera religar (trocar lente, qualidade ou modo noturno, por exemplo).
 
-Com o modo noturno ligado e numa lente com flash, a lanterna acende por instantes durante o foco, porque no escuro o autofoco não enxerga contraste. A mudança de imagem durante o foco não conta como movimento. Se não conseguir focar, a câmera avisa no site e continua no automático.
+**Focar longe** deixa a lente no infinito, com o autofoco desligado. É a melhor opção para filmar a rua ou o quintal à noite ou atrás de vidro, onde o autofoco não enxerga contraste ou mira o reflexo. Essa escolha fica salva no celular e volta sozinha quando a câmera religa. Objetos muito perto da lente ficam desfocados, e nem todo celular aceita esse ajuste.
+
+A mudança de imagem durante o foco não conta como movimento. Se não conseguir focar, a câmera avisa no site e continua no automático.
 
 ## Zoom
 

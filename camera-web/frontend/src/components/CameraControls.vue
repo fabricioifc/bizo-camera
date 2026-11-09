@@ -37,15 +37,13 @@ const zoomPresets = computed(() => {
 
 // Foco: o estado vem da câmera; apps antigos não informam.
 const focusHint = computed(() => {
-  const night = props.settings?.night && props.settings?.torchAvailable
-    ? ' No modo noturno, a lanterna acende por instantes para ajudar.'
-    : '';
   return {
-    auto: `Automático. Se a imagem estiver desfocada, aponte para o que quer ver nítido no centro e toque em Focar agora.${night}`,
+    auto: 'Automático. Focar agora mira o que está no centro da imagem. À noite ou atrás de vidro, use Focar longe.',
     focusing: 'Focando…',
     locked: 'Foco fixado no centro da imagem. Fica assim até você voltar ao automático ou a câmera religar.',
-    failed: `Não conseguiu focar: pouca luz ou nada nítido no centro da imagem. Continua no automático.${night}`,
-    unavailable: 'Esta lente tem foco fixo, sem ajuste.',
+    far: 'Foco fixo longe, sem autofoco. Bom para rua e quintal, inclusive à noite e atrás de vidro. Fica salvo no celular.',
+    failed: 'Não conseguiu focar: pouca luz ou nada nítido no centro da imagem. Continua no automático. Tente Focar longe.',
+    unavailable: 'Esta lente não permite esse ajuste de foco.',
   }[props.settings?.focus] ?? 'Atualize o app do celular para usar.';
 });
 
@@ -140,7 +138,15 @@ function set(key, value) {
               @click="$emit('focus', 'lock')"
             >{{ settings.focus === 'focusing' ? 'Focando…' : 'Focar agora' }}</button>
             <button
-              v-if="settings.focus === 'locked'"
+              type="button"
+              class="btn btn-secondary"
+              :class="{ active: settings.focus === 'far' }"
+              :disabled="settings.focus === undefined || settings.focus === 'focusing'"
+              @click="$emit('focus', 'far')"
+            >Focar longe</button>
+          </div>
+          <div v-if="settings.focus === 'locked' || settings.focus === 'far'" class="zoom-presets">
+            <button
               type="button"
               class="btn btn-secondary"
               @click="$emit('focus', 'auto')"

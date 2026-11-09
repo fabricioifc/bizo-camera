@@ -48,6 +48,7 @@ object CameraSettings {
     private const val KEY_TORCH = "torch"
     private const val KEY_VIDEO = "video"
     const val KEY_NIGHT = "night"
+    private const val KEY_FOCUS_FAR = "focusFar"
     const val KEY_ZOOM = "zoom"
     private const val KEY_ZOOM_MIN = "zoomMin"
     private const val KEY_ZOOM_MAX = "zoomMax"
@@ -111,6 +112,13 @@ object CameraSettings {
 
     fun setNight(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean(KEY_NIGHT, on).apply()
+    }
+
+    /** Foco fixo longe (infinito), escolhido pelo site; volta sozinho quando a câmera religa. */
+    fun focusFar(context: Context): Boolean = prefs(context).getBoolean(KEY_FOCUS_FAR, false)
+
+    fun setFocusFar(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_FOCUS_FAR, on).apply()
     }
 
     /** Zoom pedido (1 = normal; abaixo de 1 usa a grande-angular, se houver). */
