@@ -13,7 +13,8 @@ const MAX_BULK_REMOVE = MAX_EVENTS_PER_DEVICE;
 const MAX_SNAPSHOT_BYTES = 512 * 1024;
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024; // "Foto agora", em qualidade alta
 const PHOTO_TIMEOUT_MS = 20_000;
-const MAX_CLIP_BYTES = 8 * 1024 * 1024; // vídeo curto do movimento (MP4)
+const MAX_CLIP_BYTES = 8 * 1024 * 1024; // vídeo do movimento (MP4)
+const FOCUS_MODES = ['lock', 'auto'];
 const CLIP_WAIT_MS = 2 * 60 * 1000; // a câmera manda o vídeo alguns segundos depois do movimento
 const ID_PATTERN = /^[a-f0-9]{16}$/;
 const MAX_NAME_LENGTH = 40;
@@ -352,6 +353,11 @@ function createDevices({ store, hub, alerts, releases, snapshotDir, clipStorageB
      */
     handleViewerMessage(deviceId, data) {
       const message = parseJson(data);
+      // Foco: "lock" foca e mantém; "auto" volta ao automático.
+      if (message?.type === 'focus') {
+        if (FOCUS_MODES.includes(message.mode)) hub.sendToDevice(deviceId, { type: 'focus', mode: message.mode });
+        return;
+      }
       if (message?.type !== 'configure') return;
       const changes = sanitizeChanges(message.settings);
       if (Object.keys(changes).length) hub.sendToDevice(deviceId, { type: 'configure', settings: changes });

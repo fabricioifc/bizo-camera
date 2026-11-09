@@ -29,6 +29,9 @@ describe('valores do controle remoto', () => {
   it('o estado da câmera inclui se a lanterna existe', () => {
     assert.deepEqual(sanitizeReport({ lens: 'back', torchAvailable: false }), { lens: 'back', torchAvailable: false });
     assert.deepEqual(sanitizeReport({ zoom: 0.6, zoomMin: 0.6, zoomMax: 8 }), { zoom: 0.6, zoomMin: 0.6, zoomMax: 8 });
+    assert.deepEqual(sanitizeReport({ focus: 'locked' }), { focus: 'locked' });
+    assert.deepEqual(sanitizeReport({ focus: 'outro' }), {});
+    assert.deepEqual(sanitizeChanges({ focus: 'locked' }), {});
   });
 });
 
@@ -90,6 +93,16 @@ describe('controle remoto pela página', () => {
     assert.deepEqual(late.messages.find((m) => m.type === 'settings').settings, expected);
     first.close();
     late.close();
+  });
+
+  it('o pedido de foco chega à câmera, só com modo válido', async () => {
+    const viewer = await openViewer();
+    viewer.send(JSON.stringify({ type: 'focus', mode: 'lock', extra: 1 }));
+    viewer.send(JSON.stringify({ type: 'focus', mode: 'outro' }));
+    viewer.send(JSON.stringify({ type: 'focus', mode: 'auto' }));
+    await wait(150);
+    assert.deepEqual(cameraMessages.filter((m) => m.type === 'focus'), [{ type: 'focus', mode: 'lock' }, { type: 'focus', mode: 'auto' }]);
+    viewer.close();
   });
 
   it('muitos pedidos seguidos são limitados', async () => {

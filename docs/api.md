@@ -26,7 +26,7 @@ Rotas HTTP e WebSocket do `camera-web`.
 - `DELETE /api/events/:id`: remove o evento, com foto e vídeo.
 - `GET /api/push/key`: chave pública VAPID para assinar as notificações.
 - `POST /api/push/subscribe` e `POST /api/push/unsubscribe`: ativa ou desativa os alertas neste navegador.
-- `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`. Além dos quadros, recebe mensagens `health`, `motion` e `settings` (estado atual das configurações) e envia à câmera `start`, `stop` e `configure` (mudanças pedidas pelo site).
-- `WS /ws/view?device=...`: conexão do visualizador da conta, que recebe os quadros JPEG, a saúde, as configurações e os movimentos ao vivo, e envia `configure` para o controle remoto. Usa o cookie de sessão.
+- `WS /ws/device?id=...`: conexão da câmera, autenticada pelo `deviceSecret`. Além dos quadros, recebe mensagens `health`, `motion` e `settings` (estado atual das configurações) e envia à câmera `start`, `stop`, `configure` (mudanças pedidas pelo site) e `focus` (`mode`: `lock` ou `auto`).
+- `WS /ws/view?device=...`: conexão do visualizador da conta, que recebe os quadros JPEG, a saúde, as configurações e os movimentos ao vivo, e envia `configure` e `focus` para o controle remoto. Usa o cookie de sessão.
 
 A sessão da web fica num cookie `HttpOnly`, então o JavaScript da página não consegue lê-la. O app Android usa o token do corpo da resposta, no cabeçalho `Authorization: Bearer`.

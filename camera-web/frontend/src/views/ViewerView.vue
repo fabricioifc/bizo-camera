@@ -45,6 +45,11 @@ async function snap() {
 const tab = ref('live');
 // Movimentos que chegaram enquanto a aba Movimentos estava fechada.
 const unseen = ref(0);
+// Contador da aba: só os registros de hoje.
+const todayCount = computed(() => {
+  const today = new Date().toDateString();
+  return events.value.filter((event) => new Date(event.at).toDateString() === today).length;
+});
 
 const pill = computed(() => {
   if (!connected.value) return { text: 'Conectando', kind: 'warning' };
@@ -151,6 +156,13 @@ function configure(changes) {
   if (settings.value) settings.value = { ...settings.value, ...changes };
 }
 
+// Foco: "lock" foca e mantém; "auto" volta ao automático. A câmera responde com o resultado.
+function focus(mode) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify({ type: 'focus', mode }));
+  if (mode === 'lock' && settings.value) settings.value = { ...settings.value, focus: 'focusing' };
+}
+
 async function loadEvents() {
   try {
     const response = await api(`/api/devices/${encodeURIComponent(props.device.id)}/events`);
@@ -214,7 +226,7 @@ onBeforeUnmount(() => {
       <AppIcon name="motion" :size="18" />
       Movimentos
       <span v-if="unseen" class="tab-badge" :aria-label="`${unseen} novos`">{{ unseen }}</span>
-      <span v-else-if="events.length" class="tab-count">{{ events.length }}</span>
+      <span v-else-if="todayCount" class="tab-count" :title="`${todayCount} hoje`" :aria-label="`${todayCount} hoje`">{{ todayCount }}</span>
     </button>
   </div>
 
@@ -227,7 +239,7 @@ onBeforeUnmount(() => {
         <span>{{ status }}</span>
       </div>
     </div>
-    <CameraControls :settings="settings" :online="online && connected" @change="configure" />
+    <CameraControls :settings="settings" :online="online && connected" @change="configure" @focus="focus" />
   </div>
 
   <div v-show="tab === 'events'">

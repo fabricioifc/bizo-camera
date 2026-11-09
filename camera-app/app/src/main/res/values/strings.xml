@@ -71,7 +71,7 @@
     <string name="rotation_270">−90°</string>
     <string name="rotation_hint">A imagem já acompanha a posição do celular (em pé ou deitado). Use só se ainda sair torta, por exemplo com o celular deitado de costas ou preso no teto.</string>
     <string name="video_switch">Gravar vídeo do movimento</string>
-    <string name="video_hint">Além da foto, grava cerca de 8 segundos (1 antes e 7 depois do movimento). Gasta mais dados e espaço no servidor.</string>
+    <string name="video_hint">Além da foto, grava cerca de 30 segundos (1 antes e 29 depois do movimento). Gasta mais dados e espaço no servidor.</string>
     <string name="torch_switch">Lanterna</string>
     <string name="torch_hint">Acende a luz do celular enquanto a câmera transmite. Só na câmera traseira.</string>
     <string name="night_switch">Modo noturno</string>

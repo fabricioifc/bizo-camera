@@ -101,10 +101,49 @@ const groups = computed(() => {
   return [...map.entries()].map(([key, list]) => ({ key, label: dayLabel(key), events: list }));
 });
 
+// Seleção para excluir: vale para o que está na tela; trocar o filtro limpa a marcação.
+const selecting = ref(false);
+const selected = ref(new Set());
+const selectedIds = computed(() => shown.value.filter((event) => selected.value.has(event.id)).map((event) => event.id));
+const allSelected = computed(() => shown.value.length > 0 && selectedIds.value.length === shown.value.length);
 const noun = computed(() => {
   const [one, many] = NOUNS[type.value];
-  return shown.value.length === 1 ? one : many;
+  return selectedIds.value.length === 1 ? one : many;
 });
+
+watch([type, day, hour], () => {
+  selected.value = new Set();
+});
+
+function stopSelecting() {
+  selecting.value = false;
+  selected.value = new Set();
+}
+
+// Marca ou desmarca vários de uma vez (o dia inteiro ou tudo o que está na tela).
+function setSelected(list, on) {
+  const next = new Set(selected.value);
+  for (const event of list) {
+    if (on) next.add(event.id);
+    else next.delete(event.id);
+  }
+  selected.value = next;
+}
+
+function toggleEvent(event) {
+  setSelected([event], !selected.value.has(event.id));
+}
+
+const groupMarked = (group) => group.events.filter((event) => selected.value.has(event.id)).length;
+
+function toggleGroup(group) {
+  setSelected(group.events, groupMarked(group) !== group.events.length);
+}
+
+function openOrToggle(event) {
+  if (selecting.value) toggleEvent(event);
+  else emit('open', event);
+}
 
 function toggleHour(h) {
   hour.value = hour.value === h ? null : h;
@@ -114,15 +153,11 @@ function barStyle(bucket, kind) {
   return { height: `${(bucket[kind] / busiestHour.value) * 100}%` };
 }
 
-// Exclui tudo o que o filtro está mostrando.
-async function removeShown() {
-  const ids = shown.value.map((event) => event.id);
+// Exclui o que está marcado.
+async function removeSelected() {
+  const ids = selectedIds.value;
   if (!ids.length) return;
-  const where = [
-    day.value === 'all' ? 'de todos os dias' : `de ${dayLabel(day.value).toLowerCase()}`,
-    hour.value === null ? '' : `entre ${hour.value}h e ${hour.value + 1}h`,
-  ].filter(Boolean).join(', ');
-  if (!window.confirm(`Excluir ${ids.length} ${noun.value} ${where}? Fotos e vídeos são apagados e não dá para desfazer.`)) return;
+  if (!window.confirm(`Excluir ${ids.length} ${noun.value}? Fotos e vídeos são apagados e não dá para desfazer.`)) return;
   removing.value = true;
   error.value = '';
   try {
@@ -131,7 +166,7 @@ async function removeShown() {
       body: JSON.stringify({ ids }),
     }));
     emit('removed', ids);
-    hour.value = null;
+    stopSelecting();
   } catch (err) {
     error.value = err.message;
   } finally {
@@ -142,7 +177,7 @@ async function removeShown() {
 
 <template>
   <section class="timeline-view" aria-label="Movimentos e fotos">
-    <!-- Filtros: tipo e exclusão do que está filtrado -->
+    <!-- Filtros: tipo e seleção para excluir -->
     <div class="timeline-filters">
       <div class="segmented" role="group" aria-label="Tipo">
         <button
@@ -154,22 +189,27 @@ async function removeShown() {
           @click="type = option.value"
         >{{ option.label }}</button>
       </div>
-      <button
-        type="button"
-        class="btn btn-danger"
-        :disabled="!shown.length || removing"
-        @click="removeShown"
-      >
-        <AppIcon name="trash" :size="16" />
-        {{ removing ? 'Excluindo…' : `Excluir ${shown.length} ${noun}` }}
+      <button v-if="!selecting" type="button" class="btn btn-secondary" :disabled="!shown.length" @click="selecting = true">
+        <AppIcon name="check" :size="16" />
+        Selecionar
       </button>
+      <div v-else class="selection-bar">
+        <button type="button" class="btn btn-secondary" @click="setSelected(shown, !allSelected)">
+          {{ allSelected ? 'Desmarcar tudo' : 'Marcar tudo' }}
+        </button>
+        <button type="button" class="btn btn-danger" :disabled="!selectedIds.length || removing" @click="removeSelected">
+          <AppIcon name="trash" :size="16" />
+          {{ removing ? 'Excluindo…' : `Excluir ${selectedIds.length}` }}
+        </button>
+        <button type="button" class="btn btn-ghost" :disabled="removing" @click="stopSelecting">Cancelar</button>
+      </div>
     </div>
     <StatusMessage :text="error" kind="error" />
 
     <!-- Dias com eventos -->
     <div v-if="days.length" class="day-chips" role="group" aria-label="Dia">
       <button type="button" class="day-chip" :class="{ active: day === 'all' }" @click="day = 'all'">
-        Todos os dias <span>{{ ofType.length }}</span>
+        Todos os dias
       </button>
       <button
         v-for="item in days"
@@ -230,13 +270,33 @@ async function removeShown() {
     <p v-else-if="loaded && !shown.length" class="card events-none muted">Nada com este filtro.</p>
 
     <div v-for="group in groups" :key="group.key" class="day-group">
-      <h3 class="day-title">{{ group.label }} <span class="muted">· {{ group.events.length }}</span></h3>
+      <div class="day-head">
+        <h3 class="day-title">{{ group.label }} <span class="muted">· {{ group.events.length }}</span></h3>
+        <label v-if="selecting" class="day-select">
+          <input
+            type="checkbox"
+            :checked="groupMarked(group) === group.events.length"
+            :indeterminate.prop="groupMarked(group) > 0 && groupMarked(group) < group.events.length"
+            @change="toggleGroup(group)"
+          >
+          Marcar o dia
+        </label>
+      </div>
       <ul class="events">
-        <li v-for="event in group.events" :key="event.id" class="card event">
-          <button type="button" class="event-open" :title="event.clip ? 'Ver vídeo' : 'Ver foto'" @click="$emit('open', event)">
+        <li v-for="event in group.events" :key="event.id" class="card event" :class="{ selected: selecting && selected.has(event.id) }">
+          <button
+            type="button"
+            class="event-open"
+            :title="selecting ? 'Marcar para excluir' : event.clip ? 'Ver vídeo' : 'Ver foto'"
+            :aria-pressed="selecting ? selected.has(event.id) : undefined"
+            @click="openOrToggle(event)"
+          >
             <img v-if="event.snapshot" :src="snapshotUrl(event.id)" alt="" loading="lazy">
             <span v-else class="no-photo"><AppIcon name="motion" /></span>
-            <span v-if="event.clip" class="event-play" aria-hidden="true"><AppIcon name="play" :size="20" /></span>
+            <span v-if="event.clip && !selecting" class="event-play" aria-hidden="true"><AppIcon name="play" :size="20" /></span>
+            <span v-if="selecting" class="event-check" :class="{ on: selected.has(event.id) }" aria-hidden="true">
+              <AppIcon v-if="selected.has(event.id)" name="check" :size="16" />
+            </span>
           </button>
           <span class="event-time">
             <span class="event-kind" :class="kindOf(event)">

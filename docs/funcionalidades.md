@@ -13,6 +13,12 @@ A tela de uma câmera tem duas abas: **Ao vivo** (imagem e controles) e **Movime
 
 O pedido vai pela conexão ao vivo do visualizador. O servidor só repassa valores conhecidos, com no máximo 20 pedidos a cada 10 segundos por visualizador. A câmera aplica, salva no aparelho e responde com o estado atual, que aparece em todos os visualizadores abertos. Precisa da versão do app com controle remoto; com a versão anterior, o cartão fica esperando a câmera.
 
+## Foco
+
+O autofoco roda sozinho, mas no escuro ele pode ficar procurando e deixar a imagem desfocada. No cartão **Controles**, **Focar agora** foca no que está no centro da imagem e mantém esse foco fixo, sem ficar procurando. Ele continua fixo até você tocar em **Voltar ao automático** ou a câmera religar (trocar lente, qualidade ou modo noturno, por exemplo).
+
+Com o modo noturno ligado e numa lente com flash, a lanterna acende por instantes durante o foco, porque no escuro o autofoco não enxerga contraste. A mudança de imagem durante o foco não conta como movimento. Se não conseguir focar, a câmera avisa no site e continua no automático.
+
 ## Zoom
 
 O zoom fica no app (aba **Câmera**) e no site (cartão **Controles**), e a faixa é a do celular. De 1× para cima, é o zoom da câmera principal. Abaixo de 1× (por exemplo, 0,6×), o app usa a câmera traseira mais aberta, a grande-angular, sem interromper a transmissão.
@@ -28,14 +34,14 @@ A chave **Modo noturno** fica no app (aba **Câmera**) e no site (cartão **Cont
 
 ## Vídeo do movimento
 
-Com **Gravar vídeo do movimento** ligado (no app ou nos controles do site), a câmera grava cerca de 8 segundos a cada movimento: 1 segundo antes e 7 depois, a 8 quadros por segundo e até 480 px no lado maior, em MP4 (H.264). A foto e a notificação saem na hora; o vídeo chega alguns segundos depois e fica no mesmo evento.
+Com **Gravar vídeo do movimento** ligado (no app ou nos controles do site), a câmera grava cerca de 30 segundos a cada movimento: 1 segundo antes e 29 depois, a 8 quadros por segundo e até 480 px no lado maior, em MP4 (H.264). A foto e a notificação saem na hora; o vídeo chega assim que termina de gravar e fica no mesmo evento. Um movimento que acontece enquanto um vídeo ainda está sendo gravado fica só com a foto.
 
 A aba **Movimentos** é uma linha do tempo:
 
 - filtro por tipo: **Tudo**, **Movimentos**, **Vídeos** ou **Fotos**;
-- os dias com registros, com a contagem de cada um; escolhendo um dia, aparece a atividade hora a hora, e tocar numa hora filtra só aquela hora;
+- os dias com registros, com a contagem de cada um (o contador da aba mostra só os de hoje); escolhendo um dia, aparece a atividade hora a hora, e tocar numa hora filtra só aquela hora;
 - a lista agrupada por dia; tocar num item abre o vídeo (ou a foto), com **Baixar** e **Remover**;
-- **Excluir N** apaga de uma vez tudo o que o filtro está mostrando (por exemplo, todos os vídeos de ontem), com confirmação.
+- **Selecionar** marca o que excluir: toque em cada item, em **Marcar o dia** para pegar um dia inteiro ou em **Marcar tudo** para pegar o que o filtro está mostrando. **Excluir N** apaga o que está marcado, com confirmação. Trocar o filtro limpa a marcação.
 
 Espaço: além do limite de 200 eventos por câmera, os vídeos de todas as câmeras somam no máximo `CLIP_STORAGE_MB` (padrão 500 MB). Acima disso, os vídeos mais antigos são apagados; o evento e a foto continuam.
 

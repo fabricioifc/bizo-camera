@@ -7,7 +7,7 @@ const props = defineProps({
   settings: { type: Object, default: null },
   online: Boolean,
 });
-const emit = defineEmits(['change']);
+const emit = defineEmits(['change', 'focus']);
 
 const LENS = [
   { value: 'back', label: 'Traseira' },
@@ -33,6 +33,20 @@ const zoomShown = computed(() => zoomDraft.value ?? props.settings?.zoom ?? 1);
 const zoomPresets = computed(() => {
   const { zoomMin = 1, zoomMax = 1 } = props.settings || {};
   return [...new Set([zoomMin, 1, 2].filter((value) => value >= zoomMin && value <= zoomMax))];
+});
+
+// Foco: o estado vem da câmera; apps antigos não informam.
+const focusHint = computed(() => {
+  const night = props.settings?.night && props.settings?.torchAvailable
+    ? ' No modo noturno, a lanterna acende por instantes para ajudar.'
+    : '';
+  return {
+    auto: `Automático. Se a imagem estiver desfocada, aponte para o que quer ver nítido no centro e toque em Focar agora.${night}`,
+    focusing: 'Focando…',
+    locked: 'Foco fixado no centro da imagem. Fica assim até você voltar ao automático ou a câmera religar.',
+    failed: `Não conseguiu focar: pouca luz ou nada nítido no centro da imagem. Continua no automático.${night}`,
+    unavailable: 'Esta lente tem foco fixo, sem ajuste.',
+  }[props.settings?.focus] ?? 'Atualize o app do celular para usar.';
 });
 
 function commitZoom(event) {
@@ -114,6 +128,25 @@ function set(key, value) {
               ? `Abaixo de 1×, usa a câmera grande-angular (até ${zoomLabel(settings.zoomMin)}).`
               : 'Este celular não oferece a grande-angular para outros apps: o zoom começa em 1×.' }}
           </span>
+        </div>
+
+        <div class="control">
+          <span class="control-label">Foco</span>
+          <div class="zoom-presets">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              :disabled="settings.focus === undefined || settings.focus === 'focusing'"
+              @click="$emit('focus', 'lock')"
+            >{{ settings.focus === 'focusing' ? 'Focando…' : 'Focar agora' }}</button>
+            <button
+              v-if="settings.focus === 'locked'"
+              type="button"
+              class="btn btn-secondary"
+              @click="$emit('focus', 'auto')"
+            >Voltar ao automático</button>
+          </div>
+          <span class="control-hint" aria-live="polite">{{ focusHint }}</span>
         </div>
 
         <div class="control">
@@ -212,7 +245,7 @@ function set(key, value) {
         <div class="switch-row">
           <span class="switch-text">
             <span class="control-label"><AppIcon name="play" :size="16" /> Gravar vídeo do movimento</span>
-            <span class="control-hint">Cerca de 8 segundos, além da foto. Gasta mais dados e espaço.</span>
+            <span class="control-hint">Cerca de 30 segundos, além da foto. Gasta mais dados e espaço.</span>
           </span>
           <button
             type="button"

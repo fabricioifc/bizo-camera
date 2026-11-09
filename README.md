@@ -32,9 +32,9 @@ As capturas usam dados de demonstração: o app roda num emulador Android, com a
 ## O que ele faz
 
 - **Ao vivo:** a imagem só é transmitida quando alguém está assistindo, o que economiza dados e bateria.
-- **Movimento:** detecta movimento no próprio celular, grava foto e um vídeo de cerca de 8 segundos e avisa por notificação.
-- **Linha do tempo:** filtra por dia, hora e tipo, com baixar e remover em lote. Os vídeos mais antigos são apagados quando o espaço acaba.
-- **Controle remoto:** muda lente, zoom, rotação, qualidade, lanterna, modo noturno e detecção pelo site.
+- **Movimento:** detecta movimento no próprio celular, grava foto e um vídeo de cerca de 30 segundos e avisa por notificação.
+- **Linha do tempo:** filtra por dia, hora e tipo, com baixar e seleção para excluir vários de uma vez. Os vídeos mais antigos são apagados quando o espaço acaba.
+- **Controle remoto:** muda lente, zoom, foco, rotação, qualidade, lanterna, modo noturno e detecção pelo site.
 - **Modo noturno:** clareia a imagem no escuro e apaga a tela do celular.
 - **Foto agora:** tira uma foto em qualidade alta sem abrir o vídeo.
 - **Alertas da câmera:** avisa se ela ficar offline, sair da tomada, estiver com bateria baixa ou esquentando.

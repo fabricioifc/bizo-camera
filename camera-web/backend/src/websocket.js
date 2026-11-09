@@ -3,8 +3,8 @@
 const { WebSocketServer } = require('ws');
 const { bearerToken, cookieToken } = require('./http/respond');
 
-// Maior mensagem aceita: a "Foto agora" em qualidade alta (até 3 MB, em base64).
-const MAX_PAYLOAD = 5 * 1024 * 1024;
+// Maior mensagem aceita: o vídeo do movimento (até 8 MB, em base64, com folga para o JSON).
+const MAX_PAYLOAD = 12 * 1024 * 1024;
 const PING_MS = 30_000;
 // Comandos do visualizador (controle remoto): mensagens pequenas e poucas por vez.
 const MAX_VIEWER_MESSAGE = 2048;

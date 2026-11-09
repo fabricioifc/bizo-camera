@@ -1378,6 +1378,62 @@ code,
   font-weight: 600;
 }
 
+.day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.day-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.day-select input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selection-bar .btn {
+  padding-inline: 12px;
+}
+
+.event.selected {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+}
+
+.event-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+
+.event-check.on {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
 .events-none {
   padding: 24px;
   text-align: center;

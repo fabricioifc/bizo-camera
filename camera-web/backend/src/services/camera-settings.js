@@ -12,6 +12,8 @@ const CHOICES = {
 };
 // video: gravar o vídeo curto do movimento; night: modo noturno (exposição e tela apagada).
 const FLAGS = ['motion', 'torch', 'video', 'night'];
+// Estado do foco informado pela câmera; é só leitura (o site pede o foco por outra mensagem).
+const FOCUS_STATES = ['auto', 'focusing', 'locked', 'failed', 'unavailable'];
 
 // Zoom: número entre 0,1 e 20, com uma casa decimal (abaixo de 1 usa a grande-angular, se houver).
 function zoomValue(value) {
@@ -38,6 +40,7 @@ function sanitizeChanges(input) {
 function sanitizeReport(input) {
   const settings = sanitizeChanges(input);
   if (input && typeof input.torchAvailable === 'boolean') settings.torchAvailable = input.torchAvailable;
+  if (FOCUS_STATES.includes(input?.focus)) settings.focus = input.focus;
   // Faixa de zoom do celular (ex.: 0,6 a 8).
   const min = zoomValue(input?.zoomMin);
   const max = zoomValue(input?.zoomMax);

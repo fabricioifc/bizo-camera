@@ -114,7 +114,8 @@ class ClipRecorder(
         const val FPS = 8
         private const val FRAME_INTERVAL_MS = 1000L / FPS
         const val PREROLL_MS = 1_000L
-        const val AFTER_MOTION_MS = 7_000L
+        // Vídeo de 30 segundos no total: 1 antes e 29 depois do movimento.
+        const val AFTER_MOTION_MS = 29_000L
         const val MAX_SIDE = 480
     }
 }
